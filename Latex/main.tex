@@ -1,0 +1,71 @@
+\documentclass[10pt]{article}
+\usepackage{enumitem}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{biblatex} % citations
+\usepackage{indentfirst} % makes sure first paragraph of a section is indented
+\addbibresource{citations.bib} % actually adds citations
+\usepackage{titlesec}
+\usepackage{titling} % moves title up the page
+\usepackage{parskip}
+\titleformat*{\section}{\large\bfseries}
+
+\droptitle = -40mm % working !
+\title{Rank Revealing QR Factorization Project Proposal}
+\author{Zane Perry, Luke Sellmayer, Maed\'ee Trank-Greene}
+\date{November 3rd, 2023}
+
+\begin{document}
+
+\maketitle
+
+\section{Abstract}
+In the realm of numerical linear algebra, the Rank-Revealing QR factorization (RRQRF) has emerged as a powerful tool across various fields, from machine learning to reduced order modeling. This innovative approach to matrix factorization addresses fundamental challenges faced in other commonly used rank-revealing factorizations. Traditional methods such as QR decomposition and SVD are computationally expensive methods for large matrices and can become unstable when facing ill-conditioned or rank-deficient matrices. We are motivated to utilize RRQRF because, with a fraction of the cost, it is more stable in the presence of ill-conditioned or rank-deficient matrices.
+
+In this project, we aim to dig deep into the theoretical foundations the weaknesses of commonly used rank-revealing factorizations to motivate the study of the theory and practical applications of RRQRF. In particular, we are interested in applying the theoretical background of the RRQRF to a signal processing problem: specifically, using RRQRF to decompose a signal into noisy and non-noisy components in order to ``clean" the signal. We will compare our results using RRQRF to the paper that uses a different rank-revealing factorization, ULLV \cite{7083201}
+
+\section{Presenting Introductory Material}
+We will first begin by reviewing some of the linear algebra needed to understand the project. We will begin by reviewing the rank of the matrix and the various ways that it can be defined, such as by number of pivots, linear independence of rows and columns, and dimensions of image and coimage. Singular values of a matrix will also be reviewed.
+
+Next, we will motivate the idea of approximating an $m \times n$ matrix $A$ of rank $r$ with a low-rank matrix $A_k$, also $m \times n$, of rank $k < r$. We will motivate this idea by explaining how $A$ may be ill-conditioned or be very large in size and thus computationally expensive to store. In such cases, it can be beneficial to use an approximation of $A$, $A_k$, that avoids these problems. 
+
+Then, we will describe the singular value decomposition of matrix $A$, the SVD, and explain how it is a rank revealing factorization since the rank of $A$ can be determined by looking at the diagonal matrix $\Sigma$ in the factorization. We will then go on to show how the SVD can be used to create a very accurate approximation of $A$, $A_k$, that circumvents the ill-conditioning of $A$ while also requiring less space to store.
+
+Finally, we will go into how computing the SVD of $A$ is computationally expensive, which will motivate our discussion into other rank-revealing factorizations that can be used to approximate $A$, namely the RRQRF.
+
+\section{Proposed Timeline}
+\begin{itemize}[align=left,
+  leftmargin=6em,
+  itemindent=0pt,
+  labelsep=0pt,
+  labelwidth=6em,
+  parsep=3.5pt]
+    \item[\textbf{11/3/23: }] Schedule meeting to discuss proposal
+    \item[\textbf{11/8/23: }] Tentative date for proposal meeting
+    \item[\textbf{11/9/23: }] Theoretical background and numerical examples for project \\ background completed
+    \item[\textbf{11/10/23: }] Theoretical background and numerical examples for QR factorization with column pivoting completed
+    \item[\textbf{11/12/23: }] Coding for introductory material completed
+    \item[\textbf{11/15/23: }] Theoretical background and a rough draft of pseudocode for \\ independent component completed
+    \item[\textbf{11/17/23: }] Schedule meeting to discuss rough draft
+    \item[\textbf{11/18/23: }] Rough draft completed
+    \item[\textbf{11/27/23: }] Tentative date for rough draft meeting
+    \item[\textbf{11/27/23: }] Review feedback from rough draft and adjust our rough draft/project directions as needed
+    \item[\textbf{11/28/23: }] Start creating presentation
+    \item[\textbf{12/10/23: }] Coding for independent component completed
+    \item[\textbf{12/10/23: }] Schedule meeting to discuss final draft
+    \item[\textbf{12/11/23: }] Presentation completed
+    \item[\textbf{12/13/23: }] Tentative date for final draft meeting
+    \item[\textbf{12/19/23: }] Final draft completed
+\end{itemize}
+
+\section{Distribution of Work}
+For the preliminary project components, all members need to understand the necessary theoretical components. Out of the numerical examples in the theoretical background, Maed\'ee will lead 3 problems, Zane will lead 3 problems, and Luke will lead 2 problems. For each problem that a team member leads, they must present their work to their teammates to check for accuracy and ensure complete understanding amongst all members. 
+
+For the independent component, all members must understand the theoretical components. All members will write the pseudocode together to ensure that any member can jump in when necessary. Zane and Luke will take the lead on writing the code for the independent component and Maed\'ee will supplement where needed. 
+
+For the presentation,  Maed\'ee will take the lead on creating and formatting the presentation. All members will work on building the final presentation and final draft.
+
+\printbibliography
+
+\end{document}
+
+

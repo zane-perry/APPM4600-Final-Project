@@ -1,0 +1,51 @@
+\section{Presenting Introductory Material}
+We will first begin by reviewing some of the linear algebra needed to understand the project. We will begin by reviewing the rank of matrix and the various ways that it can be defined, such as by number of pivots, linear independence of rows and columns, and dimensions of image and coimage. Singular values of a matrix will also be reviewed.
+
+Next, we will motivate the idea of approximating an $m \times n$ matrix $A$ of rank $r$ with a low rank matrix $A_k$, also $m \times n$, of rank $k < r$. We will motivate this idea by explaining how $A$ may be ill-conditioned or be very large in size and thus computationally expensive to store. In such cases, it can be beneficial to use an approximation of $A$, $A_k$, that avoids these problems. thus,  using the SVD, the singular value decomposition. We'll start by reviewing singular values and singular vectors. 
+
+Then, we will describe the singular value decomposition of matrix $A$, the SVD, and explain how it is a rank revealing factorization since the rank of $A$ can be determined by looking at the diagonal matrix $\Sigma$ in the factorization. We will then go on to show how the SVD can be used to create a very accurate approximation of $A$, $A_k$, that circumvents the ill-conditioning of $A$ while also requiring less space to store.
+
+Finally, we will go into how computing the SVD of $A$ is computationally expensive, which will motivate our discussion into other rank revealing factorizations that can be used to approximate $A$.
+
+The singular value decomposition of a nonzero real $m \times n$ matrix $A$ with rank $r > 0$ is the factorization
+\[A = P \Sigma Q^{T}\]
+where $P$ is size $m \times r$ with orthogonal columns, $\Sigma = diag(\sigma_1, ..., \sigma_r)$ is a diagonal matrix of size $r \times r$ with $A$'s singular values as its entries, and $Q^{T}$ is size $r \times n$ with orthogonal rows.\cite{appliedLinearAlgebra} We say that this factorization is \textit{rank revealing} because the rank of $A$, $r$, is found in the dimensions of $\Sigma$.
+
+We can use the singular value decomposition to approximate $A$ of rank $r$ by constructing $A_k$ of rank $k < r$. To do so, we choose a value for $k$, and create the matrices $P_k$, $\Sigma_k$, and $Q^{T}_{k}$: the leftmost $k$ columns of $P$ will form the matrix $P_k$, with size $m \times k$; the first $k$ singular values along the diagonal of $\Sigma$ will form $\Sigma_k = diag(\sigma_1, ..., \sigma_k)$ of size $k \times k$; and finally the top $k$ rows of $Q^{T}$ will form the matrix $Q^{T}_{k}$ of size $k \times n$. Finally, we let $A_{k} = P_{k}\Sigma_{k}Q^{T}_{k}$, having the same size as $A$, $n \times n$. % \cite{roughgarden} (keeps erroring idk why)
+Most importantly, among all of the $m \times n$ matrices $B$ of rank $k$, the Euclidean matrix norm $||A-B||$ is minimized when $B=A_k$, indicating the $A_k$ is the optimal rank $k$ approximation matrix of $A$. \cite{appliedLinearAlgebra}
+
+The approximation $A_k$ has the benefit of having a space complexity of only $O(k(m + n))$ to store compared to $O(mn)$ for storing $A$, which is especially beneficial when $k$ is relatively small to $m$ and $n$. % \cite{roughgarden} % (keeps erroring idk why).
+Additionally, if $A$ is $n \times n$, then its condition number is the ratio between its largest and smallest singular values, $\kappa(A) = \frac{\sigma_1}{\sigma_n}$. \cite{appliedLinearAlgebra} Ill-conditioned matrices will have very small singular values; by choosing a suitable value for $k$ to remove these small singular values, the ill-conditioning of $A$ can be circumvented by using its approximation $A_k$. \cite{appliedLinearAlgebra}.
+
+However, computing the SVD of $A$ has a time complexity of
+
+\noindent $min(O(m^{2}n), O(mn^{2}))$, which is quite expensive. % \cite{roughgarden} (keeps erroring idk why)
+As such, this motivates the need for other rank revealing factorizations that can create $A_k$ while maintaining similar accuracy to the SVD, such as the rank revealing QR factorization.
+
+
+
+
+We will first begin by reviewing the rank of a matrix. The fundamental theory of linear algebra states that the rank $r$ of an $m \times n$ matrix $A$ is given by
+\[ r = rank(A) = rank(A^T) = dim(img(A)) = dim(coimg(A)) \].  
+\noindent In other words, the rank of a matrix is the number of linearly independent columns of the matrix, which is also the number of linearly independent rows of the matrix.\cite{appliedLinearAlgebra}
+
+Next, we will motivate the idea of approximating an $m \times n$ matrix $A$ of rank $r$ with a low-rank matrix $A_k$, also $m \times n$, of rank $k < r$, using the SVD, the singular value decomposition. We'll start by reviewing singular values and singular vectors. 
+
+For an $m \times n$ matrix A, its distinct singular values ${\sigma_1, \sigma_2, ..., \sigma_r}$, with $\sigma_{1} < \sigma_{2} < ... < \sigma_{r}$, are the positive square roots of the nonzero eigenvalues,
+
+\noindent ${\lambda_1, \lambda_2, ..., \lambda_n}$, of $A$'s associated Gram matrix $K = A^{T}A$. The corresponding eigenvectors of $K$ are the singular vectors of $A$. \cite{appliedLinearAlgebra}
+
+The singular value decomposition of a nonzero real $m \times n$ matrix $A$ with rank $r > 0$ is the factorization
+\[A = P \Sigma Q^{T}\]
+where $P$ is size $m \times r$ with orthogonal columns, $\Sigma = diag(\sigma_1, ..., \sigma_r)$ is a diagonal matrix of size $r \times r$ with $A$'s singular values as its entries, and $Q^{T}$ is size $r \times n$ with orthogonal rows.\cite{appliedLinearAlgebra} We say that this factorization is \textit{rank revealing} because the rank of $A$, $r$, is found in the dimensions of $\Sigma$.
+
+We can use the singular value decomposition to approximate $A$ of rank $r$ by constructing $A_k$ of rank $k < r$. To do so, we choose a value for $k$, and create the matrices $P_k$, $\Sigma_k$, and $Q^{T}_{k}$: the leftmost $k$ columns of $P$ will form the matrix $P_k$, with size $m \times k$; the first $k$ singular values along the diagonal of $\Sigma$ will form $\Sigma_k = diag(\sigma_1, ..., \sigma_k)$ of size $k \times k$; and finally the top $k$ rows of $Q^{T}$ will form the matrix $Q^{T}_{k}$ of size $k \times n$. Finally, we let $A_{k} = P_{k}\Sigma_{k}Q^{T}_{k}$, having the same size as $A$, $n \times n$. % \cite{roughgarden} (keeps erroring idk why)
+Most importantly, among all of the $m \times n$ matrices $B$ of rank $k$, the Euclidean matrix norm $||A-B||$ is minimized when $B=A_k$, indicating the $A_k$ is the optimal rank $k$ approximation matrix of $A$. \cite{appliedLinearAlgebra}
+
+The approximation $A_k$ has the benefit of having a space complexity of only $O(k(m + n))$ to store compared to $O(mn)$ for storing $A$, which is especially beneficial when $k$ is relatively small to $m$ and $n$. % \cite{roughgarden} % (keeps erroring idk why).
+Additionally, if $A$ is $n \times n$, then its condition number is the ratio between its largest and smallest singular values, $\kappa(A) = \frac{\sigma_1}{\sigma_n}$. \cite{appliedLinearAlgebra} Ill-conditioned matrices will have very small singular values; by choosing a suitable value for $k$ to remove these small singular values, the ill-conditioning of $A$ can be circumvented by using its approximation $A_k$. \cite{appliedLinearAlgebra}.
+
+However, computing the SVD of $A$ has a time complexity of
+
+\noindent $min(O(m^{2}n), O(mn^{2}))$, which is quite expensive. % \cite{roughgarden} (keeps erroring idk why)
+As such, this motivates the need for other rank revealing factorizations that can create $A_k$ while maintaining similar accuracy to the SVD, such as the rank revealing QR factorization.
