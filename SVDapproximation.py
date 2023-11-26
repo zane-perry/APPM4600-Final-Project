@@ -4,11 +4,12 @@
 import numpy as np
 import re
 import math
+import time
 
 ############################################################### global variables
 ###############################################################
 
-decimalPlaces = 2 # change this to get numpy to show you more or less digits
+decimalPlaces = 3 # change this to get numpy to show you more or less digits
 np.set_printoptions(precision=decimalPlaces)
 
 #################################################################### subroutines
@@ -73,7 +74,7 @@ def prettyPrintFactorization(A: np.array, B: np.array, C: np.array,\
         A, B, C, D: matrices
         Aname, Bname, Cname, Dname: (optional) names for the printed matrices
         precision: (optional) number of decimal places to display for matrix 
-        entries, default is decimalPlaces variable
+                   entries, default is decimalPlaces variable
     '''
 
     # get sizes, (m x n), of A, B, C, D
@@ -294,27 +295,31 @@ def computeSVD(A: np.array):
     Inputs:
         A: (m x n) matrix with rank r > 0
     Outputs:
-        (P, Sigma, Q^T), where:
+        (P, Sigma, Q^T, duration), where:
             P: (m x r) matrix with orthonormal columns
-            Sigma: (r x r) diagonal matrix containing the singular values of A
-            Q^T: (n x r) matrix with orthonormal columns
+            singularValues: (1 x r) matrix of 
+            Q^T: (r x n) matrix with orthonormal columns
+            duration: time required to compute SVD
     '''
 
     # compute P, Q^T, and the singular values of A
+    start = time.time()
     (P, singularValues, QT) = np.linalg.svd(A, full_matrices=False)
+    end = time.time()
+    duration = end - start
 
-    # create Sigma = diag(sigma_1, ..., sigma_r)
-    Sigma = np.diag(singularValues)
+    return (P, singularValues, QT, duration)
 
-    return (P, Sigma, QT)
-
-def SVDrankKApproximation(A: np.array, k):
+def SVDrankKApproximation(A: np.array, printResult=False, k=0):
     '''
     Approximates matrix A of rank r with matrix A_k of rank 1 <= k < r using the
     SVD
     Inputs:
         A: matrix to approximate
-        k: rank of desired approximation matrix
+        printResult: (optional) True will result in original factorization and 
+                     rank approximation being printed to terminal, default False
+        k: rank of desired approximation matrix, default value of 0 will choose 
+           a value for k based on gap sizes between A's singular values
     Outputs:
         (Ak, Pk, Sigmak, QTk) where:
             Ak: approximation of A
@@ -323,33 +328,80 @@ def SVDrankKApproximation(A: np.array, k):
             QTk: topmost k rows of QT
     '''
 
+    # compute SVD of A
+    P, singularValues, QT, duration = computeSVD(A)
+    # create Sigma = diag(sigma_1, ..., sigma_r)
+    Sigma = np.diag(singularValues)
+
     # find r, the rank of A
     r = np.linalg.matrix_rank(A)
-    
-    # make sure k is less than r, otherwise approximation can't be created
-    if (k > r):
+
+    # make sure k is valid
+    if k > r:
         print("ERROR in SVDrankKApproximation: k not less than or equal to", \
               "rank of A")
         return(A, None, None, None)
+    elif k == 0:
+        (kCalc, gapList) = findKfromSVGap(singularValues)
+    else:
+        kCalc = k
     
-    # compute SVD of A and output it
-    P, Sigma, QT = computeSVD(A)
-    print("SVD factorization of A:")
-    prettyPrintFactorization(A, P, Sigma, QT, Bname="P", Cname="Sigma",\
-                             Dname="QT")
-
     # compute approximation and output it
-    Pk = P[:, 0:k]
-    Sigmak = Sigma[0:k, 0:k]
-    QTk = QT[0:k, :]
+    Pk = P[:, 0:kCalc]
+    Sigmak = Sigma[0:kCalc, 0:kCalc]
+    QTk = QT[0:kCalc, :]
     Ak = np.matmul(Pk, Sigmak)
     Ak = np.matmul(Ak, QTk)
-    print("")
-    print("Approximation Ak,", "k =", str(k))
-    prettyPrintFactorization(Ak, Pk, Sigmak, QTk, Aname="Ak", Bname="Pk",\
-                             Cname="Sigmak", Dname="QTk")
 
+    # print results
+    if printResult:
+        # original SVD
+        print("SVD factorization of A, r =", str(r))
+        prettyPrintFactorization(A, P, Sigma, QT, Bname="P", Cname="Sigma",\
+                                Dname="QT")
+        # gaps between singular values
+        print("Gaps between singular values: ", end="")
+        for i in range(0, len(gapList)):
+            print(truncateNumber(gapList[i][0], decimalPlaces) + " <--|" +\
+                  truncateNumber(gapList[i][1], decimalPlaces) + "|--> ",\
+                    end="")
+            if i == len(gapList) - 1:
+                print(truncateNumber(gapList[i][2], decimalPlaces))
+        # SVD duration
+        print("Time to create SVD factorization:", str(duration), "\n")  
+        # print approximation SVD
+        print("Approximation Ak,", "k =", str(kCalc))
+        prettyPrintFactorization(Ak, Pk, Sigmak, QTk, Aname="Ak", Bname="Pk",\
+                                Cname="Sigmak", Dname="QTk")
+
+    # all done
     return(Ak, Pk, Sigmak, QTk)
+
+def findKfromSVGap(singularValues):
+    '''
+    Find a value for k to use for an Ak approximation of matrix A by finding the
+    largest gap between the singular values of A
+    Inputs:
+        A: (1 x r) matrix of singular values, arranged in decreasing order
+    Outputs:
+        k: rank to use for Ak
+        gapList: list of gaps between eigenvalues, elements are tuples of form 
+        (sigma_i, gap, sigma_(i + 1))
+    '''
+
+    maxGap = -1
+    gapList = []
+    maxGapIndex = -1
+    for i in range(0, len(singularValues) - 1):
+        sigmai = singularValues[i]
+        sigmaii = singularValues[i + 1]
+        gap = sigmai - sigmaii
+        gapList.append((sigmai, gap, sigmaii))
+        if gap > maxGap:
+            maxGap = gap
+            maxGapIndex = i
+    
+    return (maxGapIndex + 1, gapList)
 
 ######################################################################### driver
 #########################################################################
@@ -361,14 +413,15 @@ def driver():
 
     # - create an m x n matrix A with integer elements randomly selected from a 
     #   uniform distribution on the interval [a, b]
-    m = 3
+    m = 4
     n = 4
     a = -50
     b = 50
     A = np.random.randint(a, b, [m, n])
     
     # - choose an approximating rank
-    k = 2
+    # - if k = 0, a suitable value for k will be calculated automatically later
+    k = 0
 
     # - create Ak, the rank k approximation of A
     # - the matrices used to construct it can be stored as well
@@ -376,7 +429,7 @@ def driver():
     #   so k must be less than or equal to both m and n
     # - decrease the decimalPlaces variable at the top of this file if the
     #   terminal output looks messy
-    Ak, Pk, Sigmak, QTk = SVDrankKApproximation(A, k)
+    Ak, Pk, Sigmak, QTk = SVDrankKApproximation(A, printResult=True, k=k)
 
 # - only call driver if this file is run from terminal, prevents driver() from
 #   being called if this file is imported into another file
