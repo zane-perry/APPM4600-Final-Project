@@ -5,6 +5,7 @@ import numpy as np
 import re
 import math
 import time
+from generateDeficientMatrix import generate_matrix
 
 ############################################################### global variables
 ###############################################################
@@ -416,13 +417,15 @@ def driver():
     ## example usage
     ##
 
+
+    # create a random (m x n) matrix A with rank deficiency rDef
     # - create an m x n matrix A with integer elements randomly selected from a 
     #   uniform distribution on the interval [a, b]
     m = 3
     n = 3
-    a = -50
-    b = 50
-    A = np.random.randint(a, b, [m, n])
+    rDef = 1
+    A = generate_matrix(m, n, rDef)
+
     
     # - choose an approximating rank
     # - if k = 0, a suitable value for k will be calculated automatically later
