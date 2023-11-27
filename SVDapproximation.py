@@ -9,7 +9,7 @@ import time
 ############################################################### global variables
 ###############################################################
 
-decimalPlaces = 3 # change this to get numpy to show you more or less digits
+decimalPlaces = 5 # change this to get numpy to show you more or less digits
 np.set_printoptions(precision=decimalPlaces)
 
 #################################################################### subroutines
@@ -297,7 +297,7 @@ def computeSVD(A: np.array):
     Outputs:
         (P, Sigma, Q^T, duration), where:
             P: (m x r) matrix with orthonormal columns
-            singularValues: (1 x r) matrix of 
+            singularValues: (1 x r) matrix of A's singular values
             Q^T: (r x n) matrix with orthonormal columns
             duration: time required to compute SVD
     '''
@@ -310,16 +310,19 @@ def computeSVD(A: np.array):
 
     return (P, singularValues, QT, duration)
 
-def SVDrankKApproximation(A: np.array, printResult=False, k=0):
+def SVDrankKApproximation(A: np.array, printFactorization=False,\
+                          printDuration=False, k=0):
     '''
     Approximates matrix A of rank r with matrix A_k of rank 1 <= k < r using the
     SVD
     Inputs:
         A: matrix to approximate
-        printResult: (optional) True will result in original factorization and 
+        printFactorization: (optional) True will result in original factorization and 
                      rank approximation being printed to terminal, default False
-        k: rank of desired approximation matrix, default value of 0 will choose 
-           a value for k based on gap sizes between A's singular values
+        printDuration: (optional) True will result in time to compute SVD 
+                       factorization being printed to terminal, default False
+        k: (optional) rank of desired approximation matrix, default value of 0 
+        will choose a value for k based on gap sizes between A's singular values
     Outputs:
         (Ak, Pk, Sigmak, QTk) where:
             Ak: approximation of A
@@ -353,8 +356,12 @@ def SVDrankKApproximation(A: np.array, printResult=False, k=0):
     Ak = np.matmul(Pk, Sigmak)
     Ak = np.matmul(Ak, QTk)
 
+    # print SVD duration
+    if printDuration:
+        print("Time to create SVD factorization:", str(duration), "\n")
+
     # print results
-    if printResult:
+    if printFactorization:
         # original SVD
         print("SVD factorization of A, r =", str(r))
         prettyPrintFactorization(A, P, Sigma, QT, Bname="P", Cname="Sigma",\
@@ -366,9 +373,7 @@ def SVDrankKApproximation(A: np.array, printResult=False, k=0):
                   truncateNumber(gapList[i][1], decimalPlaces) + "|--> ",\
                     end="")
             if i == len(gapList) - 1:
-                print(truncateNumber(gapList[i][2], decimalPlaces))
-        # SVD duration
-        print("Time to create SVD factorization:", str(duration), "\n")  
+                print(truncateNumber(gapList[i][2], decimalPlaces))  
         # print approximation SVD
         print("Approximation Ak,", "k =", str(kCalc))
         prettyPrintFactorization(Ak, Pk, Sigmak, QTk, Aname="Ak", Bname="Pk",\
@@ -413,8 +418,8 @@ def driver():
 
     # - create an m x n matrix A with integer elements randomly selected from a 
     #   uniform distribution on the interval [a, b]
-    m = 4
-    n = 4
+    m = 3
+    n = 3
     a = -50
     b = 50
     A = np.random.randint(a, b, [m, n])
@@ -429,7 +434,11 @@ def driver():
     #   so k must be less than or equal to both m and n
     # - decrease the decimalPlaces variable at the top of this file if the
     #   terminal output looks messy
-    Ak, Pk, Sigmak, QTk = SVDrankKApproximation(A, printResult=True, k=k)
+    Ak, Pk, Sigmak, QTk = SVDrankKApproximation(A, printFactorization=True,\
+                                                printDuration=True, k=k)
+
+    # TODO: fix findK function so it finds correct gap and not just the largest
+    #       one
 
 # - only call driver if this file is run from terminal, prevents driver() from
 #   being called if this file is imported into another file
