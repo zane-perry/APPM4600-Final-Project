@@ -9,25 +9,21 @@ import time
 def driver():
 
 
-    A = generate_matrix(100,100,67)
+    A = generate_matrix(10,10,8)
 
     [Ak, R11, R12, Q11] = QRrankKApproximation1(A)
 
 
-    
-    
 
-    
-
-
-
-
-def permutedQR1(A):
+def permutedQR1(A, k=0, tol=1.e-6):
 
     start = time.time()
     Q = A.copy()
-
+    forcedRank = True
     [m,n] = Q.shape
+    if(k == 0):
+        k = n
+        forcedRank = False
 
     p = np.array(range(n))
 
@@ -36,7 +32,9 @@ def permutedQR1(A):
     for j in range(n):
         c[j] = np.linalg.norm(Q[:,j])
 
-    for i in range(n):
+    r = 0
+
+    for i in range(k):
         
         max = i
         maxNorm = c[i]
@@ -45,6 +43,10 @@ def permutedQR1(A):
             if(norm > maxNorm):
                 max = j
                 maxNorm = norm
+        if(abs(maxNorm) < tol and not forcedRank):
+            print(maxNorm)
+            break
+        r += 1
         if(max != i):
             temp = Q[:,i].copy()
             Q[:,i] = Q[:,max]
@@ -61,6 +63,7 @@ def permutedQR1(A):
             xk = Q[:,k]
             xk = xk - (np.inner(ui,xk) * ui)
             Q[:,k] = xk
+            c[k] = np.linalg.norm(Q[i:,k])
 
     P = np.zeros([n,n])
     for i in range(n):
@@ -71,21 +74,18 @@ def permutedQR1(A):
     end = time.time()
     duration = end - start
     
-    return [Q,R,P,duration]
+    return [Q,R,P,r,duration]
 
 def QRrankKApproximation1(A,k=0,tol=1.e-6):
 
 
     [m, n] = A.shape
-    [Q,R,P,duration] = permutedQR1(A)
+    [Q,R,P,r,duration] = permutedQR1(A)
 
     if(k==0):
-        k = min([m,n])
-        rii = np.diag(R)
-        for i in range(k):
-            if(abs(rii[i]) < tol):
-                k = i
-                break
+        [Q,R,P,k,duration] = permutedQR1(A)
+    else:
+        [Q,R,P,k,duration] = permutedQR1(A,k=k)
 
     R11 = R[0:k,0:k]
     R12 = R[0:k, k:]
@@ -96,8 +96,12 @@ def QRrankKApproximation1(A,k=0,tol=1.e-6):
     diff = np.linalg.norm(A - Ak@np.transpose(P))
 
     print('Time to create QR factorization 1:', duration)
-    print('Rank ', k, 'approximation')
+    print('Rank ', r, 'approximation')
     print('Error of ', diff)
+
+    #print(A)
+    #print(Q@R@np.transpose(P))
+    print(np.diag(R))
 
     return [Ak, R11, R12, Q11]
 
