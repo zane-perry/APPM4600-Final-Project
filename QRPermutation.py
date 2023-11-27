@@ -3,35 +3,18 @@ import math
 import random
 import numpy.linalg as la
 import scipy
+import time
 
 
 def driver():
 
-    #A = np.array([[-2,-3],[5,7],[-2,-2],[-4,-1]])
-    #A = np.array([[1.,-1.,0.],[2.,0.,0.],[2.,2.,1.]])
-    #A = np.array([[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]])
 
-    A = generate_matrix(5,3,2)
+    A = generate_matrix(4,4,4)
+
+    [Ak, R11, R12, Q11] = QRrankKApproximation(A)
 
     
-
-    [Q,R,P] = permutedQR(A)
     
-    [Qs,Rs,Ps] = scipy.linalg.qr(A, pivoting=True)
-    
-    
-    print('Original Matrix')
-    print(A)
-    print('Permuted QR Matrices:')
-    print(Q)
-    print(R)
-    print('Scipy Routine:')
-    print(Qs)
-    print(Rs)
-    
-
-    #print(A@P)
-    #print(Q@R)
 
     
 
@@ -40,6 +23,7 @@ def driver():
 
 def permutedQR(A):
 
+    start = time.time()
     Q = A.copy()
 
     [m,n] = Q.shape
@@ -74,11 +58,36 @@ def permutedQR(A):
             Q[:,k] = xk
 
     R = np.transpose(Q)@A@P
+
+    end = time.time()
+    duration = end - start
     
-    return [Q,R,P]
+    return [Q,R,P,duration]
 
 
+def QRrankKApproximation(A,k=0,tol=1.e-6):
 
+
+    [m, n] = A.shape
+    [Q,R,P,duration] = permutedQR(A)
+
+    if(k==0):
+        k = min([m,n])
+        rii = np.diag(R)
+        for i in range(k):
+            if(abs(rii[i]) < tol):
+                k = i
+                break
+
+    R11 = R[0:k,0:k]
+    R12 = R[0:k, k:]
+    Q11 = Q[:, 0:k]
+
+    Ak = np.block([Q11@R11, Q11@R12])
+
+    print('Time to create QR factorization:', duration)
+
+    return [Ak, R11, R12, Q11]
 
 
 
@@ -94,7 +103,7 @@ def rand_sing(dim, rank, tol=1.e-6):
         large_sing[i] = random.uniform(10, 420)
         
     for j in range(dim - rank):
-        small_sing[j] = random.uniform(10**(-16), tol)
+        small_sing[j] = random.uniform(0, tol)
         
     diag = np.append(large_sing, small_sing)
 
