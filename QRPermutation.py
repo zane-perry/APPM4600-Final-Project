@@ -9,9 +9,10 @@ import time
 def driver():
 
 
-    A = generate_matrix(4,4,4)
+    A = generate_matrix(100,100,67)
 
-    [Ak, R11, R12, Q11] = QRrankKApproximation(A)
+    [Ak, R11, R12, Q11] = QRrankKApproximation1(A)
+
 
     
     
@@ -21,21 +22,26 @@ def driver():
 
 
 
-def permutedQR(A):
+def permutedQR1(A):
 
     start = time.time()
     Q = A.copy()
 
     [m,n] = Q.shape
 
-    P = np.eye(n)
+    p = np.array(range(n))
+
+    c = np.zeros(n)
+
+    for j in range(n):
+        c[j] = np.linalg.norm(Q[:,j])
 
     for i in range(n):
         
         max = i
-        maxNorm = np.linalg.norm(Q[:,i])
+        maxNorm = c[i]
         for j in range(i + 1, n):
-            norm = np.linalg.norm(Q[:,j])
+            norm = c[j]
             if(norm > maxNorm):
                 max = j
                 maxNorm = norm
@@ -44,9 +50,8 @@ def permutedQR(A):
             Q[:,i] = Q[:,max]
             Q[:,max] = temp
 
-            temp = P[:,i].copy()
-            P[:,i] = P[:,max]
-            P[:,max] = temp
+            p[i], p[max] = p[max], p[i]
+            c[i], c[max] = c[max], c[i]
         
         ui = Q[:,i]
         ui = ui / np.linalg.norm(ui)
@@ -57,6 +62,10 @@ def permutedQR(A):
             xk = xk - (np.inner(ui,xk) * ui)
             Q[:,k] = xk
 
+    P = np.zeros([n,n])
+    for i in range(n):
+        P[p[i],i] = 1
+
     R = np.transpose(Q)@A@P
 
     end = time.time()
@@ -64,12 +73,11 @@ def permutedQR(A):
     
     return [Q,R,P,duration]
 
-
-def QRrankKApproximation(A,k=0,tol=1.e-6):
+def QRrankKApproximation1(A,k=0,tol=1.e-6):
 
 
     [m, n] = A.shape
-    [Q,R,P,duration] = permutedQR(A)
+    [Q,R,P,duration] = permutedQR1(A)
 
     if(k==0):
         k = min([m,n])
@@ -85,7 +93,11 @@ def QRrankKApproximation(A,k=0,tol=1.e-6):
 
     Ak = np.block([Q11@R11, Q11@R12])
 
-    print('Time to create QR factorization:', duration)
+    diff = np.linalg.norm(A - Ak@np.transpose(P))
+
+    print('Time to create QR factorization 1:', duration)
+    print('Rank ', k, 'approximation')
+    print('Error of ', diff)
 
     return [Ak, R11, R12, Q11]
 
