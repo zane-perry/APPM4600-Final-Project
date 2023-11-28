@@ -6,6 +6,7 @@ import re
 import math
 import time
 from generateDeficientMatrix import generate_matrix
+from operator import itemgetter
 
 ############################################################### global variables
 ###############################################################
@@ -31,24 +32,31 @@ def truncateNumber(num, precision):
     # convert num to string
     strNum = str(num)
 
-    # find index of decimal point, otherwise just return what was given
-    try:
+    # number has decimal point and is in scientific notation
+    scientific = "e" in strNum and "." in strNum
+    # number has decimal point, not in scientific notation
+    decimal = "e" not in strNum and "." in strNum
+
+    # find indices of e's and .'s and truncate
+    if scientific:
         pointIndex = strNum.index(".")
-    except ValueError as VE:
+        eIndex = strNum.index("e")
+        decimals = len(strNum[pointIndex:eIndex])
+        # make sure we can actually truncate
+        if precision > decimals:
+            return strNum
+        return strNum[0 : pointIndex + precision + 1] + strNum[eIndex :]
+    elif decimal:
+        pointIndex = strNum.index(".")
+        decimals = len(strNum[pointIndex:]) - 1
+        # make sure we can actually truncate
+        if precision > decimals:
+            return strNum
+        return strNum[0 : pointIndex + precision + 1]
+    else:
+        # nothing to truncate
         return strNum
-
-    # calculate number of decimal places
-    decimals = len(strNum[pointIndex:]) - 1
     
-    # make sure we can actually truncate, otherwise just return what was given
-    if (precision > decimals):
-        return strNum
-
-    # truncate strNum
-    strNum = strNum[0: pointIndex + precision + 1]
-
-    return strNum
-
 def prettyPrintFactorization(A: np.array, B: np.array, C: np.array,\
                              D: np.array, Aname="A", Bname="B", Cname="C",\
                                 Dname="D", precision=decimalPlaces):
@@ -318,12 +326,14 @@ def SVDrankKApproximation(A: np.array, printFactorization=False,\
     SVD
     Inputs:
         A: matrix to approximate
-        printFactorization: (optional) True will result in original factorization and 
-                     rank approximation being printed to terminal, default False
+        printFactorization: (optional) True will result in original 
+                            factorization and rank approximation being printed 
+                            to terminal, default False
         printDuration: (optional) True will result in time to compute SVD 
                        factorization being printed to terminal, default False
         k: (optional) rank of desired approximation matrix, default value of 0 
-        will choose a value for k based on gap sizes between A's singular values
+           will choose a value for k based on gap sizes between A's singular 
+           values
     Outputs:
         (Ak, Pk, Sigmak, QTk) where:
             Ak: approximation of A
@@ -346,7 +356,7 @@ def SVDrankKApproximation(A: np.array, printFactorization=False,\
               "rank of A")
         return(A, None, None, None)
     elif k == 0:
-        (kCalc, gapList) = findKfromSVGap(singularValues)
+        (kCalc, gapList) = kFromOrderGap(singularValues)
     else:
         kCalc = k
     
@@ -367,8 +377,8 @@ def SVDrankKApproximation(A: np.array, printFactorization=False,\
         print("SVD factorization of A, r =", str(r))
         prettyPrintFactorization(A, P, Sigma, QT, Bname="P", Cname="Sigma",\
                                 Dname="QT")
-        # gaps between singular values
-        print("Gaps between singular values: ", end="")
+        # order differences
+        print("Order differences between singular values: ", end="")
         for i in range(0, len(gapList)):
             print(truncateNumber(gapList[i][0], decimalPlaces) + " <--|" +\
                   truncateNumber(gapList[i][1], decimalPlaces) + "|--> ",\
@@ -383,31 +393,28 @@ def SVDrankKApproximation(A: np.array, printFactorization=False,\
     # all done
     return(Ak, Pk, Sigmak, QTk)
 
-def findKfromSVGap(singularValues):
+def kFromOrderGap(singularValues):
     '''
-    Find a value for k to use for an Ak approximation of matrix A by finding the
-    largest gap between the singular values of A
+    Given a list of singular values of some matrix A, finds a value of k to use 
+    for the approximating matrix A_k by examining the changes in order between 
+    consecutive singular values
     Inputs:
         A: (1 x r) matrix of singular values, arranged in decreasing order
     Outputs:
         k: rank to use for Ak
-        gapList: list of gaps between eigenvalues, elements are tuples of form 
-        (sigma_i, gap, sigma_(i + 1))
+        orderDiffList: list of differences of order between singular values, 
+        elements are tuples of the form (sigma_i, orderDiff, sigma_(i + 1))
     '''
 
-    maxGap = -1
-    gapList = []
-    maxGapIndex = -1
-    for i in range(0, len(singularValues) - 1):
-        sigmai = singularValues[i]
-        sigmaii = singularValues[i + 1]
-        gap = sigmai - sigmaii
-        gapList.append((sigmai, gap, sigmaii))
-        if gap > maxGap:
-            maxGap = gap
-            maxGapIndex = i
+    # find max difference of order
+    orderDiffList = [(singularValues[i], np.log10(singularValues[i]) -\
+                     np.log10(singularValues[i + 1]), singularValues[i + 1])\
+                        for i in range(0, len(singularValues) - 1)]
+    maxOrderDiff = max(orderDiffList, key=itemgetter(1))
+    # index determines k value
+    k = orderDiffList.index(maxOrderDiff) + 1
     
-    return (maxGapIndex + 1, gapList)
+    return (k, orderDiffList)
 
 ######################################################################### driver
 #########################################################################
@@ -421,7 +428,7 @@ def driver():
     # create a random (m x n) matrix A with rank deficiency rDef
     # - create an m x n matrix A with integer elements randomly selected from a 
     #   uniform distribution on the interval [a, b]
-    m = 3
+    m = 7
     n = 3
     rDef = 1
     A = generate_matrix(m, n, rDef)
