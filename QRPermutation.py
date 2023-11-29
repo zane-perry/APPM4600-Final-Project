@@ -96,18 +96,14 @@ def QRGivens(A,k=0,tol=1.e-3):
     Q = np.eye(m)
     p = np.array(range(n))
 
-    forcedRank = True
-    if(k == 0):
-        k = n
-        forcedRank = False
+    
 
 
     for j in range(n):
         v = R[:,j]
         c[j] = np.matmul(np.transpose(v),v)
 
-    r = 0
-    for l in range(k):
+    for l in range(n):
         
         max = l
         maxNorm = c[l]
@@ -132,10 +128,6 @@ def QRGivens(A,k=0,tol=1.e-3):
             R = np.matmul(G,R)
             Q = np.matmul(Q,np.transpose(G),Q)
 
-        if(R[l,l] < tol and not forcedRank):
-            break
-        r += 1
-
     P = np.zeros([n,n])
     for i in range(n):
         P[p[i],i] = 1
@@ -144,7 +136,7 @@ def QRGivens(A,k=0,tol=1.e-3):
 
     duration = end - start
 
-    return [Q,R,P,r,duration]
+    return [Q,R,P,duration]
     
 
         
@@ -195,10 +187,16 @@ def QRrankKApproximation1(A,k=0,tol=1.e-3):
 
 def QRrankKApproximation2(A,k=0,tol=1.e-3):
 
+    [m,n] = A.shape
+
+    [Q,R,P,duration] = QRGivens(A,k=k,tol=tol)
+
     if(k==0):
-        [Q,R,P,k,duration] = permutedQR1(A)
-    else:
-        [Q,R,P,k,duration] = permutedQR1(A,k=k)
+        diagonals = np.diag(R)
+        for i in range(min([m,n])):
+            if(diagonals[i] < tol):
+                break
+            k += 1
 
     R11 = R[0:k,0:k]
     R12 = R[0:k, k:]
