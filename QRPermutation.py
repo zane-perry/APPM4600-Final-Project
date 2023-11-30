@@ -1,6 +1,6 @@
 import numpy as np
 import random
-import scipy
+import scipy as sp
 import time
 from generateDeficientMatrix import generate_matrix
 
@@ -172,16 +172,16 @@ def QRrankKApproximation1(A,k=0,tol=1.e-3):
     R12 = R[0:k, k:]
     Q11 = Q[:, 0:k]
 
-    Ak = np.block([np.matmul(Q11,R11), np.matmul(Q11,R12)])
+    Ak = np.block([Q11 @ R11, Q11 @ R12]) @ np.transpose(P)
 
-    diff = np.linalg.norm(A - np.matmul(Ak,np.transpose(P)))
+    diff = np.linalg.norm(A - Ak)
 
-    print('Time to create QR factorization 1:', duration)
-    print('Rank ', k, 'approximation')
-    print('Error of ', diff)
+    # print('Time to create QR factorization 1:', duration)
+    # print('Rank ', k, 'approximation')
+    # print('Error of ', diff)
 
 
-    return [Ak, R11, R12, Q11]
+    return [k, P, Q, R, Ak, Q11, R11, R12, duration]
 
 
 
@@ -214,5 +214,7 @@ def QRrankKApproximation2(A,k=0,tol=1.e-3):
     return [Ak, R11, R12, Q11]
 
 
-
-driver()
+# - only call driver if this file is run from terminal, prevents driver() from
+#   being called if this file is imported into another file
+if (__name__ == "__main__"):
+    driver()

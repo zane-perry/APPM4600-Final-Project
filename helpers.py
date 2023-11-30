@@ -2,32 +2,29 @@
 #######################################################################
 
 import numpy as np
+import scipy as sp
 import re
 import math
 import time
+import random
 from operator import itemgetter
-
-from generateDeficientMatrix import generate_matrix
-
-############################################################### global variables
-###############################################################
-
-decimalPlaces = 2 # change this to get numpy to show you more or less digits
-np.set_printoptions(precision=decimalPlaces)
 
 #################################################################### subroutines
 ####################################################################
+
+## formating subroutines
+##
 
 def truncateNumber(num, precision):
     '''
     Truncates a number to the number of decimal places specified and
     returns the number as a string. If truncation cannot be done, the original
-    number is returned as a string.
-    Inputs:
-        num: number to be truncated
-        precision: number of decimal places desired
-    Outputs:
-        strNum: truncated version of number, now a string
+    number is returned as a string.\n
+    Inputs:\n
+    \t  num: number to be truncated\n
+    \t  precision: number of decimal places desired\n
+    Outputs:\n
+    \t  strNum: truncated version of number, now a string\n
     '''
 
     # convert num to string
@@ -38,7 +35,7 @@ def truncateNumber(num, precision):
     # number has decimal point, not in scientific notation
     decimal = "e" not in strNum and "." in strNum
 
-    # find indices of e's and .'s and truncate
+    # find indices of e's and .'s, then truncate
     if scientific:
         pointIndex = strNum.index(".")
         eIndex = strNum.index("e")
@@ -57,15 +54,15 @@ def truncateNumber(num, precision):
     else:
         # nothing to truncate
         return strNum
-    
+
 def prettyPrintFactorization(A: np.array, B: np.array, C: np.array,\
-                             D: np.array, precision, Aname="A", Bname="B", Cname="C",\
-                                Dname="D"):
+                             D: np.array, precision, Aname="A", Bname="B",\
+                                Cname="C", Dname="D"):
     '''
     Pretty print the matrix factorization A = B @ C @ D with included sizes and 
-    optional matrix names.
+    optional matrix names. \n
     
-    Print format is below:
+    Print format is below (doesn't display well in intellisense):\n
     [A_11 A_12 ... A_1n]   
     [A_21 A_22 ... A_2n] = 
     [ .    .    .   .  ]
@@ -80,10 +77,12 @@ def prettyPrintFactorization(A: np.array, B: np.array, C: np.array,\
                    Bname                  Cname                  Dname
                      m x n                  m x n                  m x n
     
-    Inputs:
-        A, B, C, D: matrices
-        precision: number of decimal places to display for matrix elements
-        Aname, Bname, Cname, Dname: (optional) names for the printed matrices
+    Inputs:\n
+    \t  A, B, C, D: matrices of any size\n
+    \t  precision: number of decimal places to display for matrix elements\n
+    \t  Aname, Bname, Cname, Dname: (optional) names for the printed matrices\n
+    Outputs:\n
+    \t  None
     '''
 
     # get sizes, (m x n), of A, B, C, D
@@ -95,8 +94,6 @@ def prettyPrintFactorization(A: np.array, B: np.array, C: np.array,\
     # figure out which row to print operators "=" and "@"'s
     maxRowSize = max(Am, Bm, Cm, Dm)
     operatorRow = math.floor(maxRowSize / 2)
-    # print(maxRowSize)
-    # print(operatorRow)
 
     # find element with max length of each matrix
     maxElementLengthA = max([len(truncateNumber(element, precision))\
@@ -298,17 +295,62 @@ def prettyPrintFactorization(A: np.array, B: np.array, C: np.array,\
 
     return
 
+## matrix generation subroutines
+##
+
+def rand_sing(dim, rank, tol=1.e-6):
+    # randomly generate rank singular values that are larger than the tol
+    
+    large_sing = np.zeros(rank)
+    small_sing = np.zeros(dim - rank)
+    
+    for i in range(rank):
+        large_sing[i] = random.uniform(10, 420)
+        
+    for j in range(dim - rank):
+        small_sing[j] = random.uniform(0, tol)
+        
+    diag = np.append(large_sing, small_sing)
+
+    np.random.shuffle(diag)
+
+    
+    diag_matrix = np.diag(diag)
+    
+    return diag_matrix
+
+def generate_matrix(m,n,r):
+
+    U = sp.stats.ortho_group.rvs(m)
+    V = sp.stats.ortho_group.rvs(n)
+
+    if(m < n):
+        Sigma = rand_sing(m,r)
+        block = np.zeros([m, n-m])
+        Sigma = np.block([Sigma, block])
+    elif(m > n):
+        Sigma = rand_sing(n,r)
+        block = np.zeros([m-n,n])
+        Sigma = np.block([[Sigma],[block]])
+    else:
+        Sigma = rand_sing(m,r)
+
+    return U@Sigma@V
+
+## SVD subroutines
+##
+
 def computeSVD(A: np.array):
     '''
-    Compute the Singular Value Decomposition of matrix A.
-    Inputs:
-        A: (m x n) matrix with rank r > 0
-    Outputs:
-        (P, Sigma, Q^T, duration), where:
-            P: (m x r) matrix with orthonormal columns
-            singularValues: (1 x r) matrix of A's singular values
-            Q^T: (r x n) matrix with orthonormal columns
-            duration: time required to compute SVD
+    Compute the Singular Value Decomposition of matrix A.\n
+    Inputs:\n
+    \t  A: (m x n) matrix with rank r > 0\n
+    Outputs:\n
+    \t  (P, singularValues, Q^T, duration) where:\n
+    \t\t    P: (m x r) matrix with orthonormal columns\n
+    \t\t    singularValues: (1 x r) matrix of A's unique singular values\n
+    \t\t    QT: (r x n) matrix with orthonormal columns\n
+    \t\t    duration: time required to compute SVD\n
     '''
 
     # compute P, Q^T, and the singular values of A
@@ -319,32 +361,26 @@ def computeSVD(A: np.array):
 
     return (P, singularValues, QT, duration)
 
-def SVDrankKApproximation(A: np.array, printFactorization=False,\
-                          printDuration=False, k=0):
+def SVDrankKApproximation(A: np.array, k=0):
     '''
-    Approximates matrix A of rank r with matrix A_k of rank 1 <= k < r using the
-    SVD
-    Inputs:
-        A: matrix to approximate
-        printFactorization: (optional) True will result in original 
-                            factorization and rank approximation being printed 
-                            to terminal, default False
-        printDuration: (optional) True will result in time to compute SVD 
-                       factorization being printed to terminal, default False
-        k: (optional) rank of desired approximation matrix, default value of 0 
-           will choose a value for k based on gap sizes between A's singular 
-           values
-    Outputs:
-        (kCalc, A, P, Sigma, QT, Ak, Pk, Sigmak, QTk, duration) where:
-            kCalc: rank used for Ak
-            P: P matrix
-            Sigma: diagonal matrix of singular values 
-            QT: Q^t matrix
-            Ak: approximation of A
-            Pk: leftmost k columns of P
-            Sigmak: diagonal matrix of k largest singular values of A
-            QTk: topmost k rows of QT
-            duration: time taken to create SVD of A
+    Approximates matrix A of rank r with matrix A_k of rank 1 <= k < r using 
+    the SVD\n
+    Inputs:\n
+    \t  A: (m x n) matrix to approximate\n
+    \t  k: (optional, default 0) rank of desired approximation matrix, default 
+    \t\t  value of 0 will choose a value for k based on A's singular values\n
+    Outputs:\n
+    \t  (kCalc, A, P, Sigma, QT, Ak, Pk, Sigmak, QTk, duration) where:\n
+    \t\t  kCalc: rank used for k\n
+    \t\t  P: (m x r) matrix with orthonormal columns\n
+    \t\t  Sigma: (r x r) diagonal matrix of A's unique singular values\n
+    \t\t  QT: (r x n) matrix with orthonormal columns\n
+    \t\t  Ak: (m x n) approximation of A\n
+    \t\t  Pk: (m x k) matrix containing the leftmost k columns of P\n
+    \t\t  Sigmak: (k x k) diagonal matrix of the k largest singular values of 
+    \t\t\t  A\n
+    \t\t  QTk: (k x n) matrix containing the topmost k rows of QT\n
+    \t\t  duration: time taken to create SVD of A\n
     '''
 
     # compute SVD of A
@@ -361,53 +397,27 @@ def SVDrankKApproximation(A: np.array, printFactorization=False,\
               "rank of A")
         return(A, None, None, None)
     elif k == 0:
-        (kCalc, gapList) = kFromOrderGap(singularValues)
+        kCalc = calculateK(singularValues)
     else:
         kCalc = k
     # compute approximation and output it
     Pk = P[:, 0:kCalc]
     Sigmak = Sigma[0:kCalc, 0:kCalc]
     QTk = QT[0:kCalc, :]
-    Ak = np.matmul(Pk, Sigmak)
-    Ak = np.matmul(Ak, QTk)
+    Ak = Pk @ Sigmak @ QTk
 
-    # print SVD duration
-    if printDuration:
-        print("Time to create SVD factorization:", str(duration), "\n")
-
-    # print results
-    if printFactorization:
-        # original SVD
-        print("SVD factorization of A, r =", str(r))
-        prettyPrintFactorization(A, P, Sigma, QT, Bname="P", Cname="Sigma",\
-                                Dname="QT")
-        # order differences
-        print("Order differences between singular values: ", end="")
-        for i in range(0, len(gapList)):
-            print(truncateNumber(gapList[i][0], decimalPlaces) + " <--|" +\
-                  truncateNumber(gapList[i][1], decimalPlaces) + "|--> ",\
-                    end="")
-            if i == len(gapList) - 1:
-                print(truncateNumber(gapList[i][2], decimalPlaces))  
-        # print approximation SVD
-        print("Approximation Ak,", "k =", str(kCalc))
-        prettyPrintFactorization(Ak, Pk, Sigmak, QTk, Aname="Ak", Bname="Pk",\
-                                Cname="Sigmak", Dname="QTk")
-
-    # all done
     return(kCalc, P, Sigma, QT, Ak, Pk, Sigmak, QTk, duration)
 
-def kFromOrderGap(singularValues):
+def calculateK(singularValues: np.array):
     '''
     Given a list of singular values of some matrix A, finds a value of k to use 
     for the approximating matrix A_k by examining the changes in order between 
-    consecutive singular values
-    Inputs:
-        A: (1 x r) matrix of singular values, arranged in decreasing order
-    Outputs:
-        k: rank to use for Ak
-        orderDiffList: list of differences of order between singular values, 
-        elements are tuples of the form (sigma_i, orderDiff, sigma_(i + 1))
+    consecutive singular values\n
+    Inputs:\n
+    \t  singularValues: (1 x r) matrix of singular values, arranged in 
+    \t\t  decreasing order\n
+    Outputs:\n
+    \t  k: rank to use for Ak\n
     '''
 
     # find max difference of order
@@ -418,42 +428,280 @@ def kFromOrderGap(singularValues):
     # index determines k value
     k = orderDiffList.index(maxOrderDiff) + 1
     
-    return (k, orderDiffList)
+    return k
 
-######################################################################### driver
-#########################################################################
+## QR subroutines
+##
 
-def driver():
+def permutedQR1(A, k=0, tol=1.e-3):
 
-    ## example usage
-    ##
+    start = time.time()
+    Q = A.copy()
+    forcedRank = True
+    [m,n] = Q.shape
+    if(k == 0):
+        k = n
+        forcedRank = False
+
+    p = np.array(range(n))
+
+    c = np.zeros(n)
+
+    for j in range(n):
+        v = Q[:,j]
+        c[j] = np.matmul(np.transpose(v),v)
+
+    r = 0
+
+    for i in range(k):
+        
+        max = i
+        maxNorm = c[i]
+        for j in range(i + 1, n):
+            norm = c[j]
+            if(norm > maxNorm):
+                max = j
+                maxNorm = norm
+        if(abs(maxNorm) < tol and not forcedRank):
+            break
+        r += 1
+        if(max != i):
+            temp = Q[:,i].copy()
+            Q[:,i] = Q[:,max]
+            Q[:,max] = temp
+
+            p[i], p[max] = p[max], p[i]
+            c[i], c[max] = c[max], c[i]
+        
+        ui = Q[:,i]
+        ui = ui / np.linalg.norm(ui)
+        Q[:,i] = ui
+
+        for k in range(i + 1, n):
+            xk = Q[:,k]
+            inner = np.inner(ui,xk)
+            xk = xk - (inner * ui)
+            Q[:,k] = xk
+            v = Q[i:,k]
+            c[k] = np.matmul(np.transpose(v),v)
+
+    P = np.zeros([n,n])
+    for i in range(n):
+        P[p[i],i] = 1
+
+    R = np.matmul(np.matmul(np.transpose(Q),A),P)
+
+    end = time.time()
+    duration = end - start
+    
+    return [Q,R,P,r,duration]
+
+def QRGivens(A,k=0,tol=1.e-3):
 
 
-    # create a random (m x n) matrix A with rank deficiency rDef
-    m = 7
-    n = 3
-    rDef = 1
-    A = generate_matrix(m, n, rDef)
+    start = time.time()
+    R = A.copy()
+    [m,n] = R.shape
+    c = np.zeros(n)
+    Q = np.eye(m)
+    p = np.array(range(n))
 
     
-    # - choose an approximating rank
-    # - if k = 0, a suitable value for k will be calculated automatically later
-    k = 0
 
-    # - create Ak, the rank k approximation of A
-    # - the matrices used to construct it can be stored as well
-    # - SVDrankKApproximation will not work if k is greater than the rank of A,
-    #   so k must be less than or equal to both m and n
-    # - decrease the decimalPlaces variable at the top of this file if the
-    #   terminal output looks messy
-    Ak, Pk, Sigmak, QTk, duration = SVDrankKApproximation(A,\
-                                    printFactorization=True,\
-                                    printDuration=True, k=k)
 
-    # TODO: fix findK function so it finds correct gap and not just the largest
-    #       one
+    for j in range(n):
+        v = R[:,j]
+        c[j] = np.matmul(np.transpose(v),v)
 
-# - only call driver if this file is run from terminal, prevents driver() from
-#   being called if this file is imported into another file
-if (__name__ == "__main__"):
-    driver()
+    for l in range(n):
+        
+        max = l
+        maxNorm = c[l]
+        for j in range(l + 1, n):
+            norm = c[j]
+            if(norm > maxNorm):
+                max = j
+                maxNorm = norm
+        if(max != l):
+            temp = R[:,l].copy()
+            R[:,l] = R[:,max]
+            R[:,max] = temp
+            c[l], c[max] = c[max], c[l]
+            p[l], p[max] = p[max], p[l]
+        
+
+        for j in range(l+1,n):
+            c[j] = c[j] - (R[l,j]**2)
+
+        for j in range(l):
+            G = buildGivens(l,j,R[j,j],R[l,j],m)
+            R = np.matmul(G,R)
+            Q = np.matmul(Q,np.transpose(G),Q)
+
+    P = np.zeros([n,n])
+    for i in range(n):
+        P[p[i],i] = 1
+
+    end = time.time()
+
+    duration = end - start
+
+    return [Q,R,P,duration]
+
+def buildGivens(i,j,a,b,m):
+
+    r = np.hypot(a,b)
+    c = a / r
+    s = -b / r
+
+    G = np.eye(m)
+    G[i,i] = c
+    G[j,j] = c
+    G[i,j] = s
+    G[j,i] = -s
+
+    return G
+
+def QRrankKApproximation1(A,k=0,tol=1.e-3):
+
+
+    if(k==0):
+        [Q,R,P,k,duration] = permutedQR1(A)
+    else:
+        [Q,R,P,k,duration] = permutedQR1(A,k=k)
+
+    R11 = R[0:k,0:k]
+    R12 = R[0:k, k:]
+    Q11 = Q[:, 0:k]
+
+    Ak = np.block([Q11 @ R11, Q11 @ R12]) @ np.transpose(P)
+
+    diff = np.linalg.norm(A - Ak)
+
+    # print('Time to create QR factorization 1:', duration)
+    # print('Rank ', k, 'approximation')
+    # print('Error of ', diff)
+
+
+    return [k, P, Q, R, Ak, Q11, R11, R12, duration]
+
+def QRrankKApproximation2(A,k=0,tol=1.e-3):
+
+    [m,n] = A.shape
+
+    [Q,R,P,duration] = QRGivens(A,k=k,tol=tol)
+
+    if(k==0):
+        diagonals = np.diag(R)
+        for i in range(min([m,n])):
+            if(diagonals[i] < tol):
+                break
+            k += 1
+
+    R11 = R[0:k,0:k]
+    R12 = R[0:k, k:]
+    Q11 = Q[:, 0:k]
+
+    Ak = np.block([np.matmul(Q11,R11), np.matmul(Q11,R12)])
+
+    diff = np.linalg.norm(A - np.matmul(Ak,np.transpose(P)))
+
+    print('Time to create QR factorization 2:', duration)
+    print('Rank ', k, 'approximation')
+    print('Error of ', diff)
+
+
+    return [Ak, R11, R12, Q11]
+
+## comparison subroutines
+##
+
+def compareSVDandQR(A, precision, k=0, fullOutput=False):
+    '''
+    Print the time and error between the SVD and permuted QR approximations A_k 
+    of some matrix A\n
+    Inputs:\n
+    \t  A: (m x n) matrix to approximate\n
+    \t  precision: number of decimal places to display for full factorizations\n
+    \t  k: (optional, default 0) desired rank of approximation, if 0 is used, 
+    \t\t  a value for k will be determined automatically\n
+    \t  fullOutput: (optional, default False) if True, the full factorizations 
+    \t\t  will be printed\n
+    Outputs:\n
+    \t\t  (svdTime, qrTime, svdErr, qrErr) where:\n
+    \t\t\t  svdTime: time taken for SVD factorization to run\n
+    \t\t\t  qrTime: time taken for permuted QR factorization to run\n
+    \t\t\t  svdErr: error between difference of A and its SVD approximation
+    \t\t\t\t  using the 2-norm\n
+    \t\t\t  qrErr: error between difference of A and its permuted QR 
+    \t\t\t\t  factorization using the 2-norm\n
+    '''
+
+    # - calculate rank, r, of A
+    r = np.linalg.matrix_rank(A)
+
+    # make sure k <= r, otherwise we can't approximate
+    if k > r:
+        print("ERROR in compareSVDandQR: k not less than or equal to", \
+              "rank of A")
+        return(0, 0, 0, 0)
+    
+    # - create the SVD approximation of A and get time required to create the  
+    #   SVD of A
+    svdK, svdP, svdSigma, svdQT, svdAk, svdPk, svdSigmak, svdQTk, svdTime =\
+        SVDrankKApproximation(A, k=k)
+    
+    # - create the QR approximation of A and get the time required to create the
+    #   QR factorization of A
+    qrK, qrP, qrQ, qrR, qrAk, qrQk, qrR11, qrR12, qrTime =\
+        QRrankKApproximation1(A, k=k)
+    qrPT = np.transpose(qrP)
+    qrRk = np.block([qrR11, qrR12])
+
+    # compute errors between A and its approximations
+    svdErr = np.linalg.norm(A - svdAk, 2)
+    qrErr = np.linalg.norm(A - qrAk, 2)
+
+    # TODO: finish output part
+
+    # output
+    print("\nTime to compute SVD factorization of A:", str(svdTime))
+    print("||A - A_K||_2 =", str(svdErr))
+    print("\nTime to compute permuted QR factorization of A:", str(qrTime))
+    print("||A - A_k||_2 =", str(qrErr))
+
+    # optional output
+    if fullOutput:
+        # disclaimer
+        print("\nDisplayed precision:", str(precision), "decimal places")
+        
+        # original SVD
+        print("\nSVD factorization of A with rank r =", str(r))
+        prettyPrintFactorization(A, svdP, svdSigma, svdQT, precision,\
+                                 Aname="A", Bname="P", Cname="Sigma",\
+                                    Dname="Q^T")
+        
+        # SVD approximation
+        print("\nApproximation A_k built from SVD factorization with rank k =",\
+              str(svdK))
+        prettyPrintFactorization(svdAk, svdPk, svdSigmak, svdQTk,\
+                                 precision, Aname="A_k", Bname="P_k",\
+                                    Cname="Sigma_k", Dname="Q_k^T")
+        
+        # original QR
+        print("\nQR factorization of A with rank r =", str(r))
+        prettyPrintFactorization(A, qrQ, qrR, qrPT, precision,\
+                                 Aname="A", Bname="Q", Cname="R",\
+                                    Dname="P^T")
+        
+        # QR approximation
+        print("\nApproximation A_k built from QR factorization with rank k =",\
+              str(qrK))
+        prettyPrintFactorization(qrAk, qrQk, qrRk, qrP, precision,\
+                                 Aname="A_k", Bname="Q_k", Cname="R_k",\
+                                    Dname="P^T")
+        
+        # print("Q_k @ R_k @ P^T")
+        # print(qrQk @ qrRk @ qrPT)
+
+    return (svdTime, qrTime, svdErr, qrErr)
