@@ -5,6 +5,8 @@
 ##
 
 import numpy as np
+import scipy as sp
+import sounddevice as sd
 import re
 import math
 import time

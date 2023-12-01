@@ -3,6 +3,7 @@
 
 import numpy as np
 import scipy as sp
+import sounddevice as sd
 import re
 import math
 import time
@@ -705,3 +706,15 @@ def compareSVDandQR(A, precision, k=0, fullOutput=False):
         # print(qrQk @ qrRk @ qrPT)
 
     return (svdTime, qrTime, svdErr, qrErr)
+
+## audio subroutines
+##
+
+def recordAudio(fileName):
+    '''
+    Record audio from computer microphone and store in file\n
+    Inputs:\n
+    \t  fileName: name of audio recording file to create\n
+    Outputs:\n
+    \t  None
+    '''
