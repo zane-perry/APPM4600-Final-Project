@@ -13,6 +13,69 @@ from operator import itemgetter
 #################################################################### subroutines
 ####################################################################
 
+## audio subroutines
+##
+
+def recordAudioToDataVector(sampleRate, duration):
+    '''
+    Record audio from computer microphone and store as single channel data in a 
+    numpy array\n
+    Inputs:\n
+    \t  sampleRate: sample rate to use for recording, measured in Hz
+    \t\t  (number of samples per second)\n
+    \t  duration: length to record for, in seconds\n
+    Outputs:\n
+    \t  audioArray: (m x 1) numpy vector, where m = sampleRate * duration\n
+    '''
+    
+    frames = int(duration * sampleRate)
+    
+    print("Recording started!")
+    audioArray = sd.rec(frames=frames, samplerate=sampleRate, channels=1)
+    
+    print("Recording...")
+    # wait for recording to finish
+    sd.wait()
+    
+    print("Recording finished!")
+
+    return audioArray
+
+def dataVectorToWavFile(dataArray: np.array, sampleRate, fileName: str):
+    '''
+    Convert a data vector of an audio recording to a .wav file\n
+    Inputs:\n
+    \t  dataArray: (m x 1) numpy vector to convert\n
+    \t  sampleRate: sample rate of dataArray, measuring in Hz 
+    \t\t  (number of samples per second)\n
+    \t  fileName: name of file to create WITHOUT the extension
+    Outputs:\n
+    \t None
+    '''
+
+    newFileName = fileName + ".wav"
+    sp.io.wavfile.write(newFileName, sampleRate, dataArray)
+
+    return
+
+def wavFileToDataVector(fileName: str):
+    '''
+    Convert a mono-channel .wav audio file to a numpy array\n
+    Inputs:\n
+    \t  fileName: name of file to convert WITH extension\n
+    Outputs:\n
+    \t  (sampleRate, dataVector) where:\n
+    \t\t  sampleRate: detected sampleRate of .wav file, measured in Hz 
+    \t\t\t  (number of samples per second)\n
+    \t\t  dataVector: (m x 1) numpy array
+    '''
+
+    sampleRate, dataVector = sp.io.wavfile.read(fileName)
+    # resize dataVector from (m, ) to (m, 1)
+    dataVector = dataVector.reshape(dataVector.shape[0], 1)
+
+    return (sampleRate, dataVector)
+
 ## formating subroutines
 ##
 
@@ -706,15 +769,3 @@ def compareSVDandQR(A, precision, k=0, fullOutput=False):
         # print(qrQk @ qrRk @ qrPT)
 
     return (svdTime, qrTime, svdErr, qrErr)
-
-## audio subroutines
-##
-
-def recordAudio(fileName):
-    '''
-    Record audio from computer microphone and store in file\n
-    Inputs:\n
-    \t  fileName: name of audio recording file to create\n
-    Outputs:\n
-    \t  None
-    '''
