@@ -13,6 +13,28 @@ from operator import itemgetter
 #################################################################### subroutines
 ####################################################################
 
+## miscelleaneous
+##
+
+def average_adiag(x):
+    """Average antidiagonal elements of a 2d array
+    Parameters:
+    -----------
+    x : np.array
+        2d numpy array of size
+
+    Return:
+    -------
+    x1d : np.array
+        1d numpy array representing averaged antediangonal elements of x
+
+    """
+    x1d = [np.mean(x[::-1, :].diagonal(i)) for i in
+           range(-x.shape[0] + 1, x.shape[1])]
+    x1d = np.array(x1d)
+    x1d = x1d.reshape(x1d.shape[0], 1)
+    return np.array(x1d)
+
 ## audio subroutines
 ##
 
@@ -434,7 +456,7 @@ def SVDrankKApproximation(A: np.array, k=0):
     \t  k: (optional, default 0) rank of desired approximation matrix, default 
     \t\t  value of 0 will choose a value for k based on A's singular values\n
     Outputs:\n
-    \t  (kCalc, A, P, Sigma, QT, Ak, Pk, Sigmak, QTk, duration) where:\n
+    \t  (kCalc, P, Sigma, QT, Ak, Pk, Sigmak, QTk, duration) where:\n
     \t\t  kCalc: rank used for k\n
     \t\t  P: (m x r) matrix with orthonormal columns\n
     \t\t  Sigma: (r x r) diagonal matrix of A's unique singular values\n
