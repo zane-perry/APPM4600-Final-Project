@@ -89,14 +89,23 @@ for i in range(0, numWindows):
     k, P, Sigma, QT, Hhat, Pk, SigmaK, QTk, duration =\
         SVDrankKApproximation(H, k=kEmp)
     print("Rank of Hhat:", str(k))
-    s = Hhat[0]
-    s = s.reshape(s.shape[0], 1)
+
+    n = Hhat.shape[0]
+    shat = np.zeros(n)
+    for i in range(0, n):
+        antidiagonal = np.diag(np.fliplr(Hhat), n-i-1)
+    
+        # Calculate the mean of the antidiagonal
+        shat[i] = np.mean(antidiagonal)
+    shat = shat.reshape(shat.shape[0], 1)
+    # s = Hhat[0]
+    # s = s.reshape(s.shape[0], 1)
     #print("Length of s vector:", str(s.shape))
     if i == numWindows - 1:
-        noiselessDataVector[windowStartIndex:] = s
+        noiselessDataVector[windowStartIndex:] = shat
     else:
         noiselessDataVector[windowStartIndex : windowStartIndex +\
-                            samplesPerWindow] = s
+                            samplesPerWindow] = shat
     
     #print("Current length of noiseless vector:", str(noiselessDataVector.shape))
     #print(noiselessDataVector)
@@ -107,15 +116,23 @@ for i in range(0, numWindows):
 
 plt.figure("Maedee's Voice")
 plt.plot(xSamples, maedataVector)
+plt.xlabel("Sample number")
+plt.ylabel("Amplitude")
 plt.ylim((-1, 1))
 plt.figure("White Noise")
 plt.plot(xSamples, whiteNoiseDataVector)
+plt.xlabel("Sample number")
+plt.ylabel("Amplitude")
 plt.ylim((-1, 1))
 plt.figure("Combined")
 plt.plot(xSamples, combinedDataVector)
+plt.xlabel("Sample number")
+plt.ylabel("Amplitude")
 plt.ylim((-1, 1))
 plt.figure("After Processing")
 plt.plot(xSamples, noiselessDataVector)
+plt.xlabel("Sample number")
+plt.ylabel("Amplitude")
 plt.ylim((-1, 1))
 plt.show()
 

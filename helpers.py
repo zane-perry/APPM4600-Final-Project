@@ -74,8 +74,7 @@ def findSpeechPause(dataVector: np.array, sampleFrequency, windowDuration):
 
     return dataVector[minAverageIndex:minAverageIndex + samplesInWindow]
 
-def calculateKv2(m, eta):
-    return np.sqrt(m) * eta
+
 
 
 ## audio subroutines
