@@ -35,6 +35,49 @@ def average_adiag(x):
     x1d = x1d.reshape(x1d.shape[0], 1)
     return np.array(x1d)
 
+def findSpeechPause(dataVector: np.array, sampleFrequency, windowDuration):
+    '''
+    Given a data vector representing an audio file of someone talking, find a 
+    find a portion of that matrix where a speech pause occurs\n
+    Inputs:\n
+    \t  dataVector: (m x 1) vector of someone speaking\n
+    \t  sampleFrequency: sample frequency of dataVector, measured in Hz
+    \t\t (number of samples / s)\n
+    \t  windowDuration: length of rolling window [s]
+    Outputs:\n
+        pauseVector: (l x 1) vector containing data of a speech pause
+    '''
+
+    samplesInWindow = math.floor(sampleFrequency * windowDuration)
+    duration = dataVector.shape[0] / sampleFrequency
+    numWindows = math.ceil(duration / windowDuration)
+
+    windowStartIndex = 0
+    minAverage = 1e10
+    minAverageIndex = -1
+    for i in range(0, numWindows):
+        if i == numWindows - 1:
+            windowVector = dataVector[windowStartIndex:]
+        else:
+            windowVector = dataVector[windowStartIndex : windowStartIndex +\
+                                        samplesInWindow]
+            
+        windowAverage = np.average(np.abs(windowVector))
+        if windowAverage < minAverage:
+            minAverage = windowAverage
+            minAverageIndex = windowStartIndex
+        windowStartIndex += samplesInWindow
+
+    print(minAverage)
+    print(minAverageIndex)
+    #print(dataVector[minAverageIndex:minAverageIndex + samplesInWindow])
+
+    return dataVector[minAverageIndex:minAverageIndex + samplesInWindow]
+
+def calculateKv2(m, eta):
+    return np.sqrt(m) * eta
+
+
 ## audio subroutines
 ##
 
@@ -68,7 +111,7 @@ def dataVectorToWavFile(dataArray: np.array, sampleRate, fileName: str):
     Convert a data vector of an audio recording to a .wav file\n
     Inputs:\n
     \t  dataArray: (m x 1) numpy vector to convert\n
-    \t  sampleRate: sample rate of dataArray, measuring in Hz 
+    \t  sampleRate: sample rate of dataArray, measuring in Hz
     \t\t  (number of samples per second)\n
     \t  fileName: name of file to create WITHOUT the extension
     Outputs:\n
