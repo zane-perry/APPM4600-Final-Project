@@ -73,7 +73,7 @@ print("Difference in samples:", numMissedSamples)
 
 windowStartIndex = 0
 noiselessDataVector = np.zeros([totalSamples, 1])
-#print("Size of noiseless vector:", str(noiselessDataVector.shape))
+print("Size of noiseless vector:", str(noiselessDataVector.shape))
 for i in range(0, numWindows):
     if i == numWindows - 1:
         windowVector = combinedDataVector[windowStartIndex:]
@@ -83,23 +83,31 @@ for i in range(0, numWindows):
     print(i, "/", numWindows - 1, end="\r")
     #print("Length of window vector:", str(windowVector.shape))
     H = sp.linalg.hankel(windowVector)
-    psvd, singularvalues, qtsvd, svdduration = computeSVD(H)
+    C = (np.transpose(H) @ H)
+    psvd, singularvalues, qtsvd, svdduration = computeSVD(C)
     kEmp = np.count_nonzero(singularvalues > np.sqrt(H.shape[0]) * eta)
     print("Rank of H:", str(np.linalg.matrix_rank(H)))
+    print("Forced rank of Hhat:", str(kEmp))
     k, P, Sigma, QT, Hhat, Pk, SigmaK, QTk, duration =\
         SVDrankKApproximation(H, k=kEmp)
-    print("Rank of Hhat:", str(k))
+    phiMLS = np.eye(kEmp) - (H.shape[0] * (eta ** 2) *\
+                             np.linalg.matrix_power(SigmaK, -2))
+    
+    Hhat = Pk @ phiMLS @ SigmaK @ QTk
 
-    n = Hhat.shape[0]
+    #shat = np.transpose(Hhat[0])
+
+    n = Hhat.shape[1]
     shat = np.zeros(n)
     for i in range(0, n):
         antidiagonal = np.diag(np.fliplr(Hhat), n-i-1)
     
         # Calculate the mean of the antidiagonal
         shat[i] = np.mean(antidiagonal)
-    shat = shat.reshape(shat.shape[0], 1)
+    # shat = shat.reshape(shat.shape[0], 1)
     # s = Hhat[0]
     # s = s.reshape(s.shape[0], 1)
+    shat = shat.reshape(shat.shape[0], 1)
     #print("Length of s vector:", str(s.shape))
     if i == numWindows - 1:
         noiselessDataVector[windowStartIndex:] = shat
