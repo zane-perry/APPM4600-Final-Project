@@ -8,6 +8,7 @@ import re
 import math
 import time
 import random
+import matplotlib.pyplot as plt
 from operator import itemgetter
 
 #################################################################### subroutines
@@ -35,52 +36,10 @@ def average_adiag(x):
     x1d = x1d.reshape(x1d.shape[0], 1)
     return np.array(x1d)
 
-def findSpeechPause(dataVector: np.array, sampleFrequency, windowDuration):
-    '''
-    Given a data vector representing an audio file of someone talking, find a 
-    find a portion of that matrix where a speech pause occurs\n
-    Inputs:\n
-    \t  dataVector: (m x 1) vector of someone speaking\n
-    \t  sampleFrequency: sample frequency of dataVector, measured in Hz
-    \t\t (number of samples / s)\n
-    \t  windowDuration: length of rolling window [s]
-    Outputs:\n
-        pauseVector: (l x 1) vector containing data of a speech pause
-    '''
-
-    samplesInWindow = math.floor(sampleFrequency * windowDuration)
-    duration = dataVector.shape[0] / sampleFrequency
-    numWindows = math.ceil(duration / windowDuration)
-
-    windowStartIndex = 0
-    minAverage = 1e10
-    minAverageIndex = -1
-    for i in range(0, numWindows):
-        if i == numWindows - 1:
-            windowVector = dataVector[windowStartIndex:]
-        else:
-            windowVector = dataVector[windowStartIndex : windowStartIndex +\
-                                        samplesInWindow]
-            
-        windowAverage = np.average(np.abs(windowVector))
-        if windowAverage < minAverage:
-            minAverage = windowAverage
-            minAverageIndex = windowStartIndex
-        windowStartIndex += samplesInWindow
-
-    print(minAverage)
-    print(minAverageIndex)
-    #print(dataVector[minAverageIndex:minAverageIndex + samplesInWindow])
-
-    return dataVector[minAverageIndex:minAverageIndex + samplesInWindow]
-
-
-
-
 ## audio subroutines
 ##
 
-def recordAudioToDataVector(sampleRate, duration):
+def recordAudioToVector(sampleRate, duration):
     '''
     Record audio from computer microphone and store as single channel data in a 
     numpy array\n
@@ -105,12 +64,12 @@ def recordAudioToDataVector(sampleRate, duration):
 
     return audioArray
 
-def dataVectorToWavFile(dataArray: np.array, sampleRate, fileName: str):
+def audioVectorToWavFile(audioVector: np.array, sampleRate, fileName: str):
     '''
     Convert a data vector of an audio recording to a .wav file\n
     Inputs:\n
-    \t  dataArray: (m x 1) numpy vector to convert\n
-    \t  sampleRate: sample rate of dataArray, measuring in Hz
+    \t  audioVector: (m x 1) numpy vector to convert\n
+    \t  sampleRate: sample rate of audioVector, measuring in Hz
     \t\t  (number of samples per second)\n
     \t  fileName: name of file to create WITHOUT the extension
     Outputs:\n
@@ -118,27 +77,101 @@ def dataVectorToWavFile(dataArray: np.array, sampleRate, fileName: str):
     '''
 
     newFileName = fileName + ".wav"
-    sp.io.wavfile.write(newFileName, sampleRate, dataArray)
+    sp.io.wavfile.write(newFileName, sampleRate, audioVector)
 
     return
 
-def wavFileToDataVector(fileName: str):
+def wavFileToAudioVector(fileName: str):
     '''
     Convert a mono-channel .wav audio file to a numpy array\n
     Inputs:\n
     \t  fileName: name of file to convert WITH extension\n
     Outputs:\n
-    \t  (sampleRate, dataVector) where:\n
+    \t  (sampleRate, audioVector) where:\n
     \t\t  sampleRate: detected sampleRate of .wav file, measured in Hz 
     \t\t\t  (number of samples per second)\n
-    \t\t  dataVector: (m x 1) numpy array
+    \t\t  audioVector: (m x 1) numpy array
     '''
 
-    sampleRate, dataVector = sp.io.wavfile.read(fileName)
-    # resize dataVector from (m, ) to (m, 1)
-    dataVector = dataVector.reshape(dataVector.shape[0], 1)
+    sampleRate, audioVector = sp.io.wavfile.read(fileName)
+    # resize audioVector from (m, ) to (m, 1)
+    audioVector = audioVector.reshape(audioVector.shape[0], 1)
 
-    return (sampleRate, dataVector)
+    return (sampleRate, audioVector)
+
+def findSpeechPause(audioVector: np.array, sampleFrequency, windowDuration):
+    '''
+    Given a data vector representing an audio file of someone talking, find a 
+    find a portion of that matrix where a speech pause occurs\n
+    Inputs:\n
+    \t  audioVector: (m x 1) vector of someone speaking\n
+    \t  sampleFrequency: sample frequency of audioVector, measured in Hz
+    \t\t (number of samples / s)\n
+    \t  windowDuration: length of rolling window [s]
+    Outputs:\n
+        pauseVector: (l x 1) vector containing data of a speech pause
+    '''
+
+    samplesInWindow = math.floor(sampleFrequency * windowDuration)
+    duration = audioVector.shape[0] / sampleFrequency
+    numWindows = math.ceil(duration / windowDuration)
+
+    windowStartIndex = 0
+    minAverage = 1e10
+    minAverageIndex = -1
+    for i in range(0, numWindows):
+        if i == numWindows - 1:
+            windowVector = audioVector[windowStartIndex:]
+        else:
+            windowVector = audioVector[windowStartIndex : windowStartIndex +\
+                                        samplesInWindow]
+            
+        windowAverage = np.average(np.abs(windowVector))
+        if windowAverage < minAverage:
+            minAverage = windowAverage
+            minAverageIndex = windowStartIndex
+        windowStartIndex += samplesInWindow
+
+    print(minAverage)
+    print(minAverageIndex)
+    #print(audioVector[minAverageIndex:minAverageIndex + samplesInWindow])
+
+    return audioVector[minAverageIndex:minAverageIndex + samplesInWindow]
+
+def addWhiteNoise(audioVector: np.array, mu, eta):
+    '''
+    Add Gaussian white noise with mean mu and standard deviation eta\n
+    Inputs:\n
+    \t  audioVector: (m x 1) audio vector to add the white noise to\n
+    \t  mu: desired mean of Gaussian white noise\n
+    \t  eta: desired standard deviation of Gaussian white noise, which will 
+    \t    have variance (eta)^2\n
+    Outputs:\n
+        whiteAudioVector: (m x 1) audioVector with added white noise\n
+    '''
+
+    print(1)
+    numSamples = audioVector.shape[0]
+    whiteNoise = np.random.normal(mu, eta, size=numSamples)
+    whiteNoise = whiteNoise.reshape(whiteNoise.shape[0], 1)
+
+    whiteAudioVector = audioVector + whiteNoise
+
+    ## debugging
+
+    # samples = np.arange(0, numSamples, 1)
+
+    # plt.figure("1")
+    # plt.plot(samples, audioVector)
+    # plt.plot(samples, whiteNoise)
+    # plt.legend(["Original", "White noise"])
+    # plt.figure("2")
+    # plt.plot(samples, whiteAudioVector)
+    # plt.legend(["Combined"])
+    # plt.show()
+
+    return whiteAudioVector
+
 
 ## formating subroutines
 ##
