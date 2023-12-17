@@ -172,7 +172,9 @@ def addWhiteNoise(audioVector: np.array, mu, eta):
     return whiteAudioVector
 
 def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
-                     windowMethod: str, windowDuration=30, windowOverlap=0):
+                     hankelMethod: str, tolMethod: str, safetyFactor,\
+                        windowMethod: str, windowDuration=0.03, windowOverlap=0,\
+                            debug=False):
     '''
     Remove white noise from an audio vector\n
     Inputs:\n
@@ -183,6 +185,14 @@ def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
     \t  gainMethod: method to use to form gain matrix: either "LS" for least 
     \t    squares, "MLS" for modified least squares, "MV" for minimum variance, 
     \t    or "TDC" for time-domain constraint\n
+    \t  hankelMethod: method to use to extract the processed audio vector from 
+    \t    the Hankel matrix, "ROW" for row extraction or "AD" for averaging 
+    \t    the antidiagonals\n
+    \t  tolMethod: tolerance to use for determing the numerical rank, k, 
+    \t    of the Hankel matrix, "SQRT(M)*ETA" to use sqrt(m) * eta, "M*ETA^2" 
+    \t    to use m * eta^2\n
+    \t  safetyFactor: safety factor to use to ensure that that the numerical 
+    \t    rank k of the Hankel matrix is an underestimate
     \t  windowMethod: method used to process audio, either "BLOCKWISE" or 
     \t    "SLIDING"\n
     \t  windowDuration: duration of each window in seconds, default is 
@@ -190,9 +200,13 @@ def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
     \t  windowOverlap: if the "BLOCKWISE" windowMethod is specified, determines 
     \t    how much overlap is used between successive windows, measured in 
     \t    seconds, default is 0 s
+    \t  debug: set True to output debugging information, default False
     Outputs:\n
     \t  cleanAudioVector: (m x 1) audioVector, now with the white noise removed
     '''
+
+    # size of audioVector
+    m = audioVector.shape[0]
     
     ### NOTE: brackets [] represent units, e.g. [s] represents units of 
     #   seconds, used to make sure calculations are being done right 
@@ -202,7 +216,7 @@ def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
     #    windowDuration ms
 
     # [samples]
-    totalSamples = audioVector.shape[0]
+    totalSamples = m
 
     # [s] = ( [samples] ) / ( [samples] / [s] )
     audioVectorDuration = totalSamples / sampleRate
@@ -213,53 +227,128 @@ def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
         #   integer amount of windows with length windowDuration inside an 
         #   audioVectorDuration signal
         # - [windows] = [s] * ( [windows] / [s] )
-        numWindows = math.ceil(audioVectorDuration / windowDuration)
+        estNumWindows = math.ceil(audioVectorDuration / windowDuration)
 
         # - round down since we've included extra windows
         # - ( [samples] / [window] ) = [samples] / [windows]
-        samplesPerWindow = math.floor(totalSamples / numWindows)
+        samplesPerWindow = math.floor(totalSamples / estNumWindows)
 
         # - how many samples are we missing from rounding?
         # - [samples] = [windows] * ( [samples] / [window] )
-        numCoveredSamples = numWindows * samplesPerWindow
+        numCoveredSamples = estNumWindows * samplesPerWindow
         # [samples] = [samples] - [samples]
         numMissedSamples = totalSamples - numCoveredSamples
-
-        # - figure out how many extra windows we need to include
-        # - [windows] = [samples] / ( [samples] / [window] )
-        numExtraWindows = math.ceil(numMissedSamples / samplesPerWindow)
+        # add extra window if we are missing samples
+        if numMissedSamples != 0:
+            numWindows = estNumWindows + 1
+        else:
+            numWindows = estNumWindows
     else:
         ## TODO: implement window calculations when overlap is used between 
         #  blockwise windows as well as when sliding windows are used
         print("Haven't implemented sliding windows or windows with overlap \
               yet!")
-
-    ## debugging
+        
+    # debugging
+    if debug:
+        print("")
+        print("Total number of samples in audioVector:", str(totalSamples),\
+            "samples")
+        print("Sample rate of audioVector:", str(sampleRate), "samples per second")
+        print("Calculated duration of audioVector:", str(audioVectorDuration),\
+            "seconds")
+        print("")
+        
+        print("Desired window overlap:", str(windowOverlap), "seconds")
+        print("Desired duration of each window:", str(windowDuration), "seconds")
+        print("")
+        
+        print("Estimated number of windows needed:", str(estNumWindows), "windows")
+        print("Calculated number of samples per window :", str(samplesPerWindow),\
+            "samples / window")
+        print("")
+        
+        print("Number of samples covered using estimate of", str(estNumWindows),\
+            "windows and", str(samplesPerWindow), "samples per window:",\
+                str(numCoveredSamples), "/",  str(totalSamples), "samples")
+        print("Number of samples not covered using the above estimates:",\
+            str(numMissedSamples), "samples")
+        print("Calculated samples to use in additional last window:",\
+            str(numMissedSamples))
+        print("")
+        if numMissedSamples != 0:
+            print("SUMMARY: using", str(estNumWindows), "+ 1 windows, with",\
+                str(samplesPerWindow), "samples per window for all windows",\
+                    "except for the last one, which will use",\
+                        str(numMissedSamples), "samples")
+            print(str(estNumWindows), "*", str(samplesPerWindow), "+",\
+                str(numMissedSamples), "=",\
+                    str(estNumWindows * samplesPerWindow + numMissedSamples))
+        else:
+            print("SUMMARY: using", str(numWindows), "windows, with",\
+                str(samplesPerWindow), "samples per window for all windows")
+            print(str(numWindows), "*", str(samplesPerWindow), "=",\
+                str(numWindows * samplesPerWindow))
+        print("")
+        
+    ## process audioVector window by window
     #
+
+    # processed audio vector goes here
+    cleanAudioVector = np.zeros([m, 1])
     
+    # iterate over all windows
+    windowStartIndex = 0
+    windowEndIndex = windowStartIndex + samplesPerWindow
+    for i in range(0, numWindows):
+        # - create audio vector for current window
+        # - make sure last window has the extra samples (if there are any)
+        if i == numWindows - 1:
+            windowAudioVector = audioVector[windowStartIndex : ]
+        else:
+            windowAudioVector = audioVector[windowStartIndex : windowEndIndex]
+        
+        # create Hankel matrix and find its singular values
+        H = sp.linalg.hankel(windowAudioVector)
+        svListH = np.linalg.svd(H, compute_uv=False)
+
+        # - determine tolerance, the value that the singular values of H must be 
+        #   greater than
+        if tolMethod == "SQRT(M)*ETA":
+            tol = np.sqrt(m) * eta
+        elif tolMethod == "M*ETA^2":
+            tol = m * (eta ** 2)
+        else:
+            print("ERROR! UNKNOWN TOLERANCE METHOD SPECIFIED IN",\
+                  "removeWhiteNoise()")
+            return
+        tol *= safetyFactor
+        
+        # - calculate k, the numerical rank of H, which is the number of 
+        #   singular values of H that are greater than tolerance
+        k = sum(1 for j in svListH if j > tol)
+
+        # create the rank k SVD approximation of H
+
+        # more debugging
+        if debug:
+            print("--------------------------------------------------")
+            print("i (window number):", str(i), "/", str(numWindows - 1))
+            print("windowAudioVector shape:", str(windowAudioVector.shape))
+            print("")
+            r = np.linalg.matrix_rank(H)
+            print("Dimensions of H:", str(H.shape))
+            print("Rank of H: r =", str(r))
+            print("Calculated numerical rank of H: k =", str(k))
+        
+        windowStartIndex = windowEndIndex
+        windowEndIndex += samplesPerWindow
+
+    # print(cleanAudioVector.shape)
+    # print(cleanAudioVector)
     print("")
-    print("Total number of samples in audioVector:", str(totalSamples),\
-          "samples")
-    print("Sample rate of audioVector:", str(sampleRate), "samples per second")
-    print("Duration of audioVector:", str(audioVectorDuration), "seconds")
-    print("")
-    
-    print("Desired window overlap:", str(windowOverlap), "seconds")
-    print("Desired duration of each window:", str(windowDuration), "seconds")
-    print("")
-    
-    print("Calculated number of windows needed:", str(numWindows), "+ 1",\
-          "windows")
-    print("Calculated number of samples per window (except for last window):",\
-          str(samplesPerWindow), "samples / window")
-    print("")
-    
-    print("Number of samples covered using estimate of", str(numWindows),\
-          "windows and", str(samplesPerWindow), "samples per window:",\
-            str(numCoveredSamples), "/",  str(totalSamples), "samples")
-    print("Number of samples not covered using the above estimates:",\
-          str(numMissedSamples), "samples")
-    print("Calculated samples to use in last window:", str(numMissedSamples))
+    # print(windowAudioVector.shape)
+    # print(windowAudioVector)
 
     return
 

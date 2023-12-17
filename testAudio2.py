@@ -21,5 +21,5 @@ whiteNoiseMaedataVector = addWhiteNoise(maedataVector, 0, 0.03)
 # audioVectorToWavFile(whiteNoiseMaedataVector, maedeeSampleRate,\
 #                      "gaussian_new_maedee_voice")
 
-removeWhiteNoise(whiteNoiseMaedataVector, maedeeSampleRate, 2, "tbd",\
-                 "BLOCKWISE", 0.03, 0)
+removeWhiteNoise(whiteNoiseMaedataVector, maedeeSampleRate, 0.03, "tbd", "tbd",\
+                 "SQRT(M)*ETA", 1, "BLOCKWISE", debug=True)
