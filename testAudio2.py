@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import math
 
 from helpers import wavFileToAudioVector, audioVectorToWavFile, addWhiteNoise,\
-    removeWhiteNoise
+    removeWhiteNoiseSVD
 
 # import new_maedee_voice.wav as the audio vector maedataVector
 
@@ -17,9 +17,14 @@ fileLocation = os.path.join(currentDirectory, "Audio/", fileToImport)
 
 # create whiteNoiseMaedataVector, store as file
 
-whiteNoiseMaedataVector = addWhiteNoise(maedataVector, 0, 0.03)
-# audioVectorToWavFile(whiteNoiseMaedataVector, maedeeSampleRate,\
-#                      "gaussian_new_maedee_voice")
+whiteNoiseMaedataVector = addWhiteNoise(maedataVector, 0, 0.04)
+audioVectorToWavFile(whiteNoiseMaedataVector, maedeeSampleRate,\
+                      "gaussian_0.04_new_maedee_voice")
 
-removeWhiteNoise(whiteNoiseMaedataVector, maedeeSampleRate, 0.03, "tbd", "tbd",\
-                 "SQRT(M)*ETA", 1, "BLOCKWISE", debug=True)
+cleanMaedataVector = removeWhiteNoiseSVD(whiteNoiseMaedataVector,\
+                                         maedeeSampleRate, 0.04, "MLS", "AD",\
+                                            "SQRT(M)*ETA", 0.1, "BLOCKWISE",\
+                                                windowDuration=0.03, debug=True)
+
+audioVectorToWavFile(cleanMaedataVector, maedeeSampleRate,\
+                     "gaussian_0.04_MLS_AD_sqrtMeta_0.1_Blockwise_0")

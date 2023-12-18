@@ -138,7 +138,7 @@ def findSpeechPause(audioVector: np.array, sampleFrequency, windowDuration):
 
     return audioVector[minAverageIndex:minAverageIndex + samplesInWindow]
 
-def addWhiteNoise(audioVector: np.array, mu, eta):
+def addWhiteNoise(audioVector: np.array, mu, eta, debug=False):
     '''
     Add Gaussian white noise with mean mu and standard deviation eta\n
     Inputs:\n
@@ -146,6 +146,7 @@ def addWhiteNoise(audioVector: np.array, mu, eta):
     \t  mu: desired mean of Gaussian white noise\n
     \t  eta: desired standard deviation of Gaussian white noise, which will 
     \t    have variance (eta)^2\n
+    \t  debug: set to True to output debugging information, default False
     Outputs:\n
         whiteAudioVector: (m x 1) audioVector with added white noise\n
     '''
@@ -156,25 +157,25 @@ def addWhiteNoise(audioVector: np.array, mu, eta):
 
     whiteAudioVector = audioVector + whiteNoise
 
-    ## debugging
-
-    # samples = np.arange(0, numSamples, 1)
-
-    # plt.figure("1")
-    # plt.plot(samples, audioVector)
-    # plt.plot(samples, whiteNoise)
-    # plt.legend(["Original", "White noise"])
-    # plt.figure("2")
-    # plt.plot(samples, whiteAudioVector)
-    # plt.legend(["Combined"])
-    # plt.show()
+    # debugging
+    if debug:
+        samples = np.arange(0, numSamples, 1)
+        plt.figure("1")
+        plt.plot(samples, audioVector)
+        plt.plot(samples, whiteNoise)
+        plt.legend(["Original", "White noise"])
+        plt.figure("2")
+        plt.plot(samples, whiteAudioVector)
+        plt.legend(["Combined"])
+        plt.show()
 
     return whiteAudioVector
 
-def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
-                     hankelMethod: str, tolMethod: str, safetyFactor,\
-                        windowMethod: str, windowDuration=0.03, windowOverlap=0,\
-                            debug=False):
+def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
+                        gainMethod: str, extractMethod: str, tolMethod: str,\
+                            safetyFactor, windowMethod: str,\
+                                windowDuration=0.03, windowOverlap=0,\
+                                    debug=False):
     '''
     Remove white noise from an audio vector\n
     Inputs:\n
@@ -185,7 +186,7 @@ def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
     \t  gainMethod: method to use to form gain matrix: either "LS" for least 
     \t    squares, "MLS" for modified least squares, "MV" for minimum variance, 
     \t    or "TDC" for time-domain constraint\n
-    \t  hankelMethod: method to use to extract the processed audio vector from 
+    \t  extractMethod: method to use to extract the processed audio vector from 
     \t    the Hankel matrix, "ROW" for row extraction or "AD" for averaging 
     \t    the antidiagonals\n
     \t  tolMethod: tolerance to use for determing the numerical rank, k, 
@@ -206,7 +207,7 @@ def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
     '''
 
     # size of audioVector
-    m = audioVector.shape[0]
+    (mAV, nAV) = audioVector.shape
     
     ### NOTE: brackets [] represent units, e.g. [s] represents units of 
     #   seconds, used to make sure calculations are being done right 
@@ -216,7 +217,7 @@ def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
     #    windowDuration ms
 
     # [samples]
-    totalSamples = m
+    totalSamples = mAV
 
     # [s] = ( [samples] ) / ( [samples] / [s] )
     audioVectorDuration = totalSamples / sampleRate
@@ -252,9 +253,13 @@ def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
     # debugging
     if debug:
         print("")
+        print("DEBUG OUTPUT: window calculations")
+        print("")
+
         print("Total number of samples in audioVector:", str(totalSamples),\
             "samples")
-        print("Sample rate of audioVector:", str(sampleRate), "samples per second")
+        print("Sample rate of audioVector:", str(sampleRate),\
+              "samples per second")
         print("Calculated duration of audioVector:", str(audioVectorDuration),\
             "seconds")
         print("")
@@ -289,13 +294,14 @@ def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
                 str(samplesPerWindow), "samples per window for all windows")
             print(str(numWindows), "*", str(samplesPerWindow), "=",\
                 str(numWindows * samplesPerWindow))
+        print("_______________________________________________________________")
         print("")
         
     ## process audioVector window by window
     #
 
     # processed audio vector goes here
-    cleanAudioVector = np.zeros([m, 1])
+    cleanAudioVector = np.zeros([mAV, 1])
     
     # iterate over all windows
     windowStartIndex = 0
@@ -307,52 +313,130 @@ def removeWhiteNoise(audioVector: np.array, sampleRate, eta, gainMethod: str,\
             windowAudioVector = audioVector[windowStartIndex : ]
         else:
             windowAudioVector = audioVector[windowStartIndex : windowEndIndex]
+
+        (mWin, nWin) = windowAudioVector.shape
         
-        # create Hankel matrix and find its singular values
+        # create Hankel matrix H and find its singular values
         H = sp.linalg.hankel(windowAudioVector)
         svListH = np.linalg.svd(H, compute_uv=False)
 
         # - determine tolerance, the value that the singular values of H must be 
-        #   greater than
+        #   greater than, based on tolMethod
         if tolMethod == "SQRT(M)*ETA":
-            tol = np.sqrt(m) * eta
+            tol = np.sqrt(mAV) * eta
         elif tolMethod == "M*ETA^2":
-            tol = m * (eta ** 2)
+            tol = mAV * (eta ** 2)
         else:
             print("ERROR! UNKNOWN TOLERANCE METHOD SPECIFIED IN",\
-                  "removeWhiteNoise()")
+                  "removeWhiteNoiseSVD()")
             return
         tol *= safetyFactor
         
         # - calculate k, the numerical rank of H, which is the number of 
         #   singular values of H that are greater than tolerance
-        k = sum(1 for j in svListH if j > tol)
+        k = sum(1 for ii in svListH if ii > tol)
+        # enforce a bare minimum numerical rank of 1
+        if k == 0:
+            k += 1
 
         # create the rank k SVD approximation of H
+        kCalc, U, Sigma, QT, Hhat, Pk, SigmaK, QTk, duration =\
+            SVDrankKApproximation(H, k=k)
+        
+        # create the gain matrix phi based on gainMethod
+        mEta2SigmaNeg2 = mAV * (eta ** 2) * np.linalg.matrix_power(SigmaK, -2)
+        if gainMethod == "LS":
+            phi = np.eye(k)
+        elif gainMethod == "MLS":
+            phi = sp.linalg.sqrtm(np.eye(k) - mEta2SigmaNeg2)
+        elif gainMethod == "MV":
+            phi = np.eye(k) - mEta2SigmaNeg2
+        elif gainMethod == "TDC":
+            # - lagrange parameter, can be changed, value of 0 leads to LS 
+            #   method while value of 1 leads to MV method
+            LAMBDA = 2
+            phi = (np.eye(k) - mEta2SigmaNeg2) *\
+                               (np.eye(k) - ((1 - LAMBDA) * mEta2SigmaNeg2))
+        else:
+            print("ERROR! UNKNOWN GAIN METHOD SPECIFIED IN",\
+                  "removeWhiteNoiseSVD()")
+            return
+            
+        # (re)compute svdHhat
+        Hhat = Pk @ phi @ SigmaK @ QTk
+        (mHhat, nHhat) = Hhat.shape
 
+        # extract clean signal s hat from Hhat depending on extractMethod
+        if extractMethod == "ROW":
+            # arbitrary row of Hhat
+            shat = np.transpose(Hhat[0])
+        elif extractMethod == "AD":
+            # average along the antidiagonals of Hhat
+            shat = np.zeros(mHhat)
+            for iii in range(mHhat):
+                # - TODO: fix runtime warning from taking the mean of an empty
+                #   slice
+                shat[iii] = np.mean(np.diag(np.fliplr(Hhat),\
+                                            math.ceil(nHhat / 2) - iii))
+        else:
+            print("ERROR! UNKNOWN EXTRACT METHOD SPECIFIED IN",\
+                  "removeWhiteNoiseSVD()")
+            return
+        shat = shat.reshape(shat.shape[0], 1)
+        (ms, ns) = shat.shape
+
+        # - append shat to the complete processed audio vector
+        # - make sure to account for the last window
+        if i == numWindows - 1:
+            cleanAudioVector[windowStartIndex :] = shat
+        else:
+            cleanAudioVector[windowStartIndex : windowEndIndex] = shat
+        
         # more debugging
         if debug:
-            print("--------------------------------------------------")
+            print("DEBUG OUTPUT: numerical ranks of H matrices")
+            print("")
+
             print("i (window number):", str(i), "/", str(numWindows - 1))
             print("windowAudioVector shape:", str(windowAudioVector.shape))
             print("")
+            
             r = np.linalg.matrix_rank(H)
             print("Dimensions of H:", str(H.shape))
             print("Rank of H: r =", str(r))
             print("Calculated numerical rank of H: k =", str(k))
+
+            print("Dimensions of shat:", str(shat.shape))
+            print("")
+            print("")
+
         
         windowStartIndex = windowEndIndex
         windowEndIndex += samplesPerWindow
 
-    # print(cleanAudioVector.shape)
-    # print(cleanAudioVector)
-    print("")
-    # print(windowAudioVector.shape)
-    # print(windowAudioVector)
+    # even more debugging
+    if debug:
+        print("_______________________________________________________________")
+        print("")
+        print("DEBUG OUTPUT: cleanAudioVector")
+        print("")
 
-    return
+        print("Shape of cleanAudioVector")
+        print(cleanAudioVector.shape)
+        print("")
 
+        samples = np.arange(0, totalSamples)
+        plt.figure()
+        plt.plot(samples, audioVector)
+        plt.legend(["Signal with white noise"])
 
+        plt.figure()
+        plt.plot(samples, cleanAudioVector)
+        plt.legend(["Processed signal"])
+
+        plt.show()
+
+    return cleanAudioVector
 
 ## formating subroutines
 ##
