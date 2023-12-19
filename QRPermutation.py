@@ -20,8 +20,9 @@ def driver():
 
 
     
-    print('QR factorizations for an', m, 'by', n, 'matrix with numerical rank', r)
+    print('QR factorizations for a', m, 'by', n, 'matrix with numerical rank', r)
 
+    '''
     [Q,R,duration,diff] = normalQR(A)
     print('Time to create QR factorization:', duration)
     print('Error of ', diff)
@@ -42,7 +43,12 @@ def driver():
     print('Time to create QR factorization (Givens Rotations Modified):', duration)
     print('Rank ', k, 'approximation')
     print('Error of ', diff)
+    '''
 
+    [k, P, Q, R, Ak, Q11, R11, R12, duration, diff] = QRrankKApproximation(A)
+    print('Time to create QR factorization (Givens Rotations Modified):', duration)
+    print('Rank ', k, 'approximation')
+    print('Error of ', diff)
 
     
     
@@ -52,6 +58,34 @@ def driver():
     #comparePermuted(201,50)
     
 
+
+def QRrankKApproximation(A,k=0,tol=1.e-6):
+
+    [m,n] = A.shape
+
+    if(k==0):
+        fullRank = min([m,n])
+        [Q,R,P,k,duration] = householderQR(A,k=fullRank)
+
+        diagR = np.diag(R)
+        for r in range (0, fullRank):
+            if (diagR[r] < tol):
+                k = r
+                break
+
+
+    else:
+        [Q,R,P,k,duration] = householderQR(A,k=k)
+
+    R11 = R[0:k,0:k]
+    R12 = R[0:k, k:]
+    Q11 = Q[:, 0:k]
+
+    Ak = np.block([Q11 @ R11, Q11 @ R12]) @ np.transpose(P)
+
+    diff = np.linalg.norm(A - Ak)
+
+    return [k, P, Q, R, Ak, Q11, R11, R12, duration, diff]
     
 
 
