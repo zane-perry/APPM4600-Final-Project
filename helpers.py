@@ -132,8 +132,8 @@ def findSpeechPause(audioVector: np.array, sampleFrequency, windowDuration):
             minAverageIndex = windowStartIndex
         windowStartIndex += samplesInWindow
 
-    print(minAverage)
-    print(minAverageIndex)
+    #print(minAverage)
+    #print(minAverageIndex)
     #print(audioVector[minAverageIndex:minAverageIndex + samplesInWindow])
 
     return audioVector[minAverageIndex:minAverageIndex + samplesInWindow]
@@ -873,6 +873,35 @@ def calculateK(singularValues: np.array):
 
 ## QR subroutines
 ##
+
+
+def QRrankKApproximation(A,k=0,tol=1.e-6):
+
+    [m,n] = A.shape
+
+    if(k==0):
+        fullRank = min([m,n])
+        [Q,R,P,k,duration] = householderQR(A,k=fullRank)
+
+        diagR = np.diag(R)
+        for r in range (0, fullRank):
+            if (diagR[r] < tol):
+                k = r
+                break
+
+
+    else:
+        [Q,R,P,k,duration] = householderQR(A,k=k)
+
+    R11 = R[0:k,0:k]
+    R12 = R[0:k, k:]
+    Q11 = Q[:, 0:k]
+
+    Ak = np.block([Q11 @ R11, Q11 @ R12]) @ np.transpose(P)
+
+    diff = np.linalg.norm(A - Ak)
+
+    return [k, P, Q, R, Ak, Q11, R11, R12, duration, diff]
 
 def msgQRrankKApproximation(A,k=0,tol=1.e-3):
 
