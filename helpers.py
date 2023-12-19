@@ -226,7 +226,9 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
 
     cleanAudioPreVector = [[]] * avN
 
-    cleanAudioVector = None
+    cleanAudioVector = np.zeros(avN)
+    cleanAudioVector = cleanAudioVector.reshape(cleanAudioVector.shape[0], 1)
+
 
     # window calculations for blockwise windows with no overlap between windows
     if windowMethod == "BLOCKWISE" and overlapDuration == 0:
@@ -516,7 +518,8 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
             hCol = windowAudioVector[0 : hm]
             hRow = windowAudioVector[hm - 1: winN + 1]
             H = sp.linalg.hankel(hCol, hRow)
-            svListH = np.linalg.svd(H, compute_uv=False)
+            HTH = np.transpose(H) @ H
+            svListH = np.linalg.svd(HTH, compute_uv=False)
 
             # - determine tolerance, the value that the singular values of H must be 
             #   greater than, based on tolMethod
@@ -599,60 +602,27 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
             if debug:
                 print("Dimensions of shat:", str(shat.shape))
 
-            for v, vi in zip(range(windowStartIndex, windowEndIndex), range(0, ms)):
-                cleanAudioPreVector[v].append(shat[vi][0])
+            #for v, vi in zip(range(windowStartIndex, windowEndIndex), range(0, ms)):
+                #leanAudioPreVector[v].append(shat[vi][0])
                 # if debug:
                 #     print(v, vi)
                 #     print(cleanAudioPreVector[v])
 
-            #cleanAudioVector[windowStartIndex : windowEndIndex] = shat
-            
+
+
+
             windowStartIndex += (samplesPerWindow - samplesPerOverlap)
             windowEndIndex = windowStartIndex + (samplesPerWindow)
             iv += 1
 
-        cleanAudioVector = []
-        for vii in range(0, len(cleanAudioPreVector)):
-            if debug:
-                print("vii:", str(vii), "/", str(len(cleanAudioPreVector)), end = "\r")
-            highAvg = np.mean(np.array([elem for elem in cleanAudioPreVector[vii] if elem > 0]), dtype=np.float64)
-            lowAvg = np.mean(np.array([elem for elem in cleanAudioPreVector[vii] if elem < 0]), dtype=np.float64)
-            if np.abs(highAvg) > np.abs(lowAvg):
-                cleanAudioVector.append(highAvg)
-            else:
-                cleanAudioVector.append(lowAvg)
-
-        cleanAudioVector = np.array(cleanAudioVector)
-        cleanAudioVector = cleanAudioVector.reshape(cleanAudioVector.shape[0], 1)
-        
-        if debug:
-            print("_______________________________________________________________")
-            print("")
-            print("DEBUG OUTPUT: cleanAudioVector")
-            print("")
-
-            print("Shape of cleanAudioVector")
-            #print(cleanAudioVector.shape)
-            print("")
-
-            samples = np.arange(0, totalSamples)
-            plt.figure()
-            plt.plot(samples, audioVector)
-            plt.legend(["Signal with white noise"])
-
-            plt.figure()
-            plt.plot(samples, cleanAudioVector)
-            plt.legend(["Processed signal"])
-
-            plt.show()
-
-        return cleanAudioVector
+        # cleanAudioVector = np.zeros(avN)
+        # for vii in range(0, len(cleanAudioPreVector)):
+        #     if debug:
+        #         print("vii:", str(vii), "/", str(len(cleanAudioPreVector)), end = "\r")
+        #     avg = np.mean(np.array(cleanAudioPreVector[vii]), dtype=np.float64)
+        #     cleanAudioVector[vii] = avg
             
-
-            # if i == numWindows - 1:
-            #     cleanAudioVector[windowStartIndex :] = shat
-            # else:
-            #     cleanAudioVector[windowStartIndex : windowEndIndex] = shat
+        
             
     print("got here!")
     # even more debugging
@@ -674,6 +644,18 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
         plt.figure()
         plt.plot(samples, cleanAudioVector)
         plt.legend(["Processed signal"])
+
+        plt.figure()
+        plt.plot(samples, audioVector - cleanAudioVector)
+        plt.legend(["Residuals"])
+
+        rowCleanAudioVector = cleanAudioVector.reshape(cleanAudioVector.shape[0])
+        rowAudioVector = audioVector.reshape(audioVector.shape[0])
+        plt.figure()
+        plt.magnitude_spectrum(rowAudioVector, Fs=sampleRate, scale="linear")
+        plt.magnitude_spectrum(rowCleanAudioVector, Fs=sampleRate, scale="linear")
+        plt.legend(["Frequency spectrum of clean signal", "Frequency spectrum of clean signal"])
+
 
         plt.show()
 
