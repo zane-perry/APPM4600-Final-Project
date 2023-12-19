@@ -174,7 +174,7 @@ def addWhiteNoise(audioVector: np.array, mu, eta, debug=False):
 def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
                         gainMethod: str, extractMethod: str, tolMethod: str,\
                             safetyFactor, windowMethod: str,\
-                                windowDuration=0.03, windowOverlap=0,\
+                                windowDuration=0.03, overlapDuration=0,\
                                     debug=False):
     '''
     Remove white noise from an audio vector\n
@@ -198,7 +198,7 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
     \t    "SLIDING"\n
     \t  windowDuration: duration of each window in seconds, default is 
     \t   0.03 s = 30 ms\n
-    \t  windowOverlap: if the "BLOCKWISE" windowMethod is specified, determines 
+    \t  overlapDuration: if the "BLOCKWISE" windowMethod is specified, determines 
     \t    how much overlap is used between successive windows, measured in 
     \t    seconds, default is 0 s
     \t  debug: set True to output debugging information, default False
@@ -223,7 +223,7 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
     audioVectorDuration = totalSamples / sampleRate
 
     # window calculations for blockwise windows with no overlap between windows
-    if windowMethod == "BLOCKWISE" and windowOverlap == 0:
+    if windowMethod == "BLOCKWISE" and overlapDuration == 0:
         # - include extra windows by rounding up since there might not be an 
         #   integer amount of windows with length windowDuration inside an 
         #   audioVectorDuration signal
@@ -244,58 +244,73 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
             numWindows = estNumWindows + 1
         else:
             numWindows = estNumWindows
-    else:
+
+        # debugging
+        if debug:
+            print("")
+            print("DEBUG OUTPUT: window calculations")
+            print("")
+
+            print("Total number of samples in audioVector:", str(totalSamples),\
+                "samples")
+            print("Sample rate of audioVector:", str(sampleRate),\
+                "samples per second")
+            print("Calculated duration of audioVector:", str(audioVectorDuration),\
+                "seconds")
+            print("")
+            
+            print("Desired window overlap:", str(overlapDuration), "seconds")
+            print("Desired duration of each window:", str(windowDuration), "seconds")
+            print("")
+            
+            print("Estimated number of windows needed:", str(estNumWindows), "windows")
+            print("Calculated number of samples per window :", str(samplesPerWindow),\
+                "samples / window")
+            print("")
+            
+            print("Number of samples covered using estimate of", str(estNumWindows),\
+                "windows and", str(samplesPerWindow), "samples per window:",\
+                    str(numCoveredSamples), "/",  str(totalSamples), "samples")
+            print("Number of samples not covered using the above estimates:",\
+                str(numMissedSamples), "samples")
+            print("Calculated samples to use in additional last window:",\
+                str(numMissedSamples))
+            print("")
+            if numMissedSamples != 0:
+                print("SUMMARY: using", str(estNumWindows), "+ 1 windows, with",\
+                    str(samplesPerWindow), "samples per window for all windows",\
+                        "except for the last one, which will use",\
+                            str(numMissedSamples), "samples")
+                print(str(estNumWindows), "*", str(samplesPerWindow), "+",\
+                    str(numMissedSamples), "=",\
+                        str(estNumWindows * samplesPerWindow + numMissedSamples))
+            else:
+                print("SUMMARY: using", str(numWindows), "windows, with",\
+                    str(samplesPerWindow), "samples per window for all windows")
+                print(str(numWindows), "*", str(samplesPerWindow), "=",\
+                    str(numWindows * samplesPerWindow))
+            print("_______________________________________________________________")
+            print("")
+    elif windowMethod == "BLOCKWISE" and overlapDuration != 0:
         ## TODO: implement window calculations when overlap is used between 
         #  blockwise windows as well as when sliding windows are used
-        print("Haven't implemented sliding windows or windows with overlap \
-              yet!")
-        
-    # debugging
-    if debug:
-        print("")
-        print("DEBUG OUTPUT: window calculations")
-        print("")
 
-        print("Total number of samples in audioVector:", str(totalSamples),\
-            "samples")
-        print("Sample rate of audioVector:", str(sampleRate),\
-              "samples per second")
-        print("Calculated duration of audioVector:", str(audioVectorDuration),\
-            "seconds")
-        print("")
+        # how many samples are in the overlap?
+        # [samples] = [s] * ( [samples] / [s])
+        samplesPerOverlap = math.floor(overlapDuration * sampleRate)
+        print("Number of samples per overlap:", str(samplesPerOverlap),\
+              "samples")
         
-        print("Desired window overlap:", str(windowOverlap), "seconds")
-        print("Desired duration of each window:", str(windowDuration), "seconds")
-        print("")
+        # [samples] = [s] * ( [samples] / [s])
+        samplesPerWindow = math.ceil(windowDuration * sampleRate)
+        print("Number of samples per window:", str(samplesPerWindow), "samples")
         
-        print("Estimated number of windows needed:", str(estNumWindows), "windows")
-        print("Calculated number of samples per window :", str(samplesPerWindow),\
-            "samples / window")
-        print("")
-        
-        print("Number of samples covered using estimate of", str(estNumWindows),\
-            "windows and", str(samplesPerWindow), "samples per window:",\
-                str(numCoveredSamples), "/",  str(totalSamples), "samples")
-        print("Number of samples not covered using the above estimates:",\
-            str(numMissedSamples), "samples")
-        print("Calculated samples to use in additional last window:",\
-            str(numMissedSamples))
-        print("")
-        if numMissedSamples != 0:
-            print("SUMMARY: using", str(estNumWindows), "+ 1 windows, with",\
-                str(samplesPerWindow), "samples per window for all windows",\
-                    "except for the last one, which will use",\
-                        str(numMissedSamples), "samples")
-            print(str(estNumWindows), "*", str(samplesPerWindow), "+",\
-                str(numMissedSamples), "=",\
-                    str(estNumWindows * samplesPerWindow + numMissedSamples))
-        else:
-            print("SUMMARY: using", str(numWindows), "windows, with",\
-                str(samplesPerWindow), "samples per window for all windows")
-            print(str(numWindows), "*", str(samplesPerWindow), "=",\
-                str(numWindows * samplesPerWindow))
-        print("_______________________________________________________________")
-        print("")
+        iv = 0
+        while ((((iv + 1) * samplesPerWindow) - (iv * samplesPerOverlap) - 1) <\
+               totalSamples - 1):
+            continue
+
+    
         
     ## process audioVector window by window
     #
