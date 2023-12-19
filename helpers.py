@@ -291,12 +291,130 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
                     str(numWindows * samplesPerWindow))
             print("_______________________________________________________________")
             print("")
+
+        ## process audioVector window by window
+        #
+
+        # processed audio vector goes here
+        cleanAudioVector = np.zeros([mAV, 1])
+        
+        # iterate over all windows
+        windowStartIndex = 0
+        windowEndIndex = windowStartIndex + samplesPerWindow
+        for i in range(0, numWindows):
+            # - create audio vector for current window
+            # - make sure last window has the extra samples (if there are any)
+            if i == numWindows - 1:
+                windowAudioVector = audioVector[windowStartIndex : ]
+            else:
+                windowAudioVector = audioVector[windowStartIndex : windowEndIndex]
+
+            (mWin, nWin) = windowAudioVector.shape
+            
+            # create Hankel matrix H and find its singular values
+            H = sp.linalg.hankel(windowAudioVector)
+            svListH = np.linalg.svd(H, compute_uv=False)
+
+            # - determine tolerance, the value that the singular values of H must be 
+            #   greater than, based on tolMethod
+            if tolMethod == "SQRT(M)*ETA":
+                tol = np.sqrt(mAV) * eta
+            elif tolMethod == "M*ETA^2":
+                tol = mAV * (eta ** 2)
+            else:
+                print("ERROR! UNKNOWN TOLERANCE METHOD SPECIFIED IN",\
+                    "removeWhiteNoiseSVD()")
+                return
+            tol *= safetyFactor
+            
+            # - calculate k, the numerical rank of H, which is the number of 
+            #   singular values of H that are greater than tolerance
+            k = sum(1 for ii in svListH if ii > tol)
+            # enforce a bare minimum numerical rank of 1
+            if k == 0:
+                k += 1
+
+            # create the rank k SVD approximation of H
+            kCalc, U, Sigma, QT, Hhat, Pk, SigmaK, QTk, duration =\
+                SVDrankKApproximation(H, k=k)
+            
+            # create the gain matrix phi based on gainMethod
+            mEta2SigmaNeg2 = mAV * (eta ** 2) * np.linalg.matrix_power(SigmaK, -2)
+            if gainMethod == "LS":
+                phi = np.eye(k)
+            elif gainMethod == "MLS":
+                phi = sp.linalg.sqrtm(np.eye(k) - mEta2SigmaNeg2)
+            elif gainMethod == "MV":
+                phi = np.eye(k) - mEta2SigmaNeg2
+            elif gainMethod == "TDC":
+                # - lagrange parameter, can be changed, value of 0 leads to LS 
+                #   method while value of 1 leads to MV method
+                LAMBDA = 2
+                phi = (np.eye(k) - mEta2SigmaNeg2) *\
+                                (np.eye(k) - ((1 - LAMBDA) * mEta2SigmaNeg2))
+            else:
+                print("ERROR! UNKNOWN GAIN METHOD SPECIFIED IN",\
+                    "removeWhiteNoiseSVD()")
+                return
+                
+            # (re)compute svdHhat
+            Hhat = Pk @ phi @ SigmaK @ QTk
+            (mHhat, nHhat) = Hhat.shape
+
+            # extract clean signal s hat from Hhat depending on extractMethod
+            if extractMethod == "ROW":
+                # arbitrary row of Hhat
+                shat = np.transpose(Hhat[0])
+            elif extractMethod == "AD":
+                # average along the antidiagonals of Hhat
+                shat = np.zeros(mHhat)
+                for iii in range(mHhat):
+                    # - TODO: fix runtime warning from taking the mean of an empty
+                    #   slice
+                    shat[iii] = np.mean(np.diag(np.fliplr(Hhat),\
+                                                math.ceil(nHhat / 2) - iii))
+            else:
+                print("ERROR! UNKNOWN EXTRACT METHOD SPECIFIED IN",\
+                    "removeWhiteNoiseSVD()")
+                return
+            shat = shat.reshape(shat.shape[0], 1)
+            (ms, ns) = shat.shape
+
+            # - append shat to the complete processed audio vector
+            # - make sure to account for the last window
+            if i == numWindows - 1:
+                cleanAudioVector[windowStartIndex :] = shat
+            else:
+                cleanAudioVector[windowStartIndex : windowEndIndex] = shat
+            
+            # more debugging
+            if debug:
+                print("DEBUG OUTPUT: numerical ranks of H matrices")
+                print("")
+
+                print("i (window number):", str(i), "/", str(numWindows - 1))
+                print("windowAudioVector shape:", str(windowAudioVector.shape))
+                print("")
+                
+                r = np.linalg.matrix_rank(H)
+                print("Dimensions of H:", str(H.shape))
+                print("Rank of H: r =", str(r))
+                print("Calculated numerical rank of H: k =", str(k))
+
+                print("Dimensions of shat:", str(shat.shape))
+                print("")
+                print("")
+
+            windowStartIndex = windowEndIndex
+            windowEndIndex += samplesPerWindow
     elif windowMethod == "BLOCKWISE" and overlapDuration != 0:
         ## TODO: implement window calculations when overlap is used between 
         #  blockwise windows as well as when sliding windows are used
 
         # how many samples are in the overlap?
         # [samples] = [s] * ( [samples] / [s])
+
+        print("Total number of sample:", str(totalSamples))
         samplesPerOverlap = math.floor(overlapDuration * sampleRate)
         print("Number of samples per overlap:", str(samplesPerOverlap),\
               "samples")
@@ -306,128 +424,28 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
         print("Number of samples per window:", str(samplesPerWindow), "samples")
         
         iv = 0
-        while ((((iv + 1) * samplesPerWindow) - (iv * samplesPerOverlap) - 1) <\
-               totalSamples - 1):
-            continue
+        windowStartIndex = iv
+        windowEndIndex = ((iv + 1) * samplesPerWindow) -\
+            (windowStartIndex * samplesPerOverlap) - 1
+        # idea: store as list of lists: index of outer list will match index of
+        # the eventual clean audio vector: can simply append to the entries of 
+        # the outer list (since they are lists) when window overlap occurs. 
+        # will average over elements of each inner list to construct clean 
+        # audio vector. then convert to np array.
+        cleanAudioPreVector = []
+        while windowEndIndex < totalSamples - 1:
+            print("Window number:", str(iv))
+            print("[", str(windowStartIndex), ",", str(windowEndIndex), "]")
+            windowStartIndex += (samplesPerWindow - samplesPerOverlap)
+            windowEndIndex = windowStartIndex + (samplesPerWindow - 1)
+            iv += 1
+        print("Window number:", str(iv))
+        print("[", str(windowStartIndex), ",", str(totalSamples - 1), "]")
+            
 
     
         
-    ## process audioVector window by window
-    #
-
-    # processed audio vector goes here
-    cleanAudioVector = np.zeros([mAV, 1])
     
-    # iterate over all windows
-    windowStartIndex = 0
-    windowEndIndex = windowStartIndex + samplesPerWindow
-    for i in range(0, numWindows):
-        # - create audio vector for current window
-        # - make sure last window has the extra samples (if there are any)
-        if i == numWindows - 1:
-            windowAudioVector = audioVector[windowStartIndex : ]
-        else:
-            windowAudioVector = audioVector[windowStartIndex : windowEndIndex]
-
-        (mWin, nWin) = windowAudioVector.shape
-        
-        # create Hankel matrix H and find its singular values
-        H = sp.linalg.hankel(windowAudioVector)
-        svListH = np.linalg.svd(H, compute_uv=False)
-
-        # - determine tolerance, the value that the singular values of H must be 
-        #   greater than, based on tolMethod
-        if tolMethod == "SQRT(M)*ETA":
-            tol = np.sqrt(mAV) * eta
-        elif tolMethod == "M*ETA^2":
-            tol = mAV * (eta ** 2)
-        else:
-            print("ERROR! UNKNOWN TOLERANCE METHOD SPECIFIED IN",\
-                  "removeWhiteNoiseSVD()")
-            return
-        tol *= safetyFactor
-        
-        # - calculate k, the numerical rank of H, which is the number of 
-        #   singular values of H that are greater than tolerance
-        k = sum(1 for ii in svListH if ii > tol)
-        # enforce a bare minimum numerical rank of 1
-        if k == 0:
-            k += 1
-
-        # create the rank k SVD approximation of H
-        kCalc, U, Sigma, QT, Hhat, Pk, SigmaK, QTk, duration =\
-            SVDrankKApproximation(H, k=k)
-        
-        # create the gain matrix phi based on gainMethod
-        mEta2SigmaNeg2 = mAV * (eta ** 2) * np.linalg.matrix_power(SigmaK, -2)
-        if gainMethod == "LS":
-            phi = np.eye(k)
-        elif gainMethod == "MLS":
-            phi = sp.linalg.sqrtm(np.eye(k) - mEta2SigmaNeg2)
-        elif gainMethod == "MV":
-            phi = np.eye(k) - mEta2SigmaNeg2
-        elif gainMethod == "TDC":
-            # - lagrange parameter, can be changed, value of 0 leads to LS 
-            #   method while value of 1 leads to MV method
-            LAMBDA = 2
-            phi = (np.eye(k) - mEta2SigmaNeg2) *\
-                               (np.eye(k) - ((1 - LAMBDA) * mEta2SigmaNeg2))
-        else:
-            print("ERROR! UNKNOWN GAIN METHOD SPECIFIED IN",\
-                  "removeWhiteNoiseSVD()")
-            return
-            
-        # (re)compute svdHhat
-        Hhat = Pk @ phi @ SigmaK @ QTk
-        (mHhat, nHhat) = Hhat.shape
-
-        # extract clean signal s hat from Hhat depending on extractMethod
-        if extractMethod == "ROW":
-            # arbitrary row of Hhat
-            shat = np.transpose(Hhat[0])
-        elif extractMethod == "AD":
-            # average along the antidiagonals of Hhat
-            shat = np.zeros(mHhat)
-            for iii in range(mHhat):
-                # - TODO: fix runtime warning from taking the mean of an empty
-                #   slice
-                shat[iii] = np.mean(np.diag(np.fliplr(Hhat),\
-                                            math.ceil(nHhat / 2) - iii))
-        else:
-            print("ERROR! UNKNOWN EXTRACT METHOD SPECIFIED IN",\
-                  "removeWhiteNoiseSVD()")
-            return
-        shat = shat.reshape(shat.shape[0], 1)
-        (ms, ns) = shat.shape
-
-        # - append shat to the complete processed audio vector
-        # - make sure to account for the last window
-        if i == numWindows - 1:
-            cleanAudioVector[windowStartIndex :] = shat
-        else:
-            cleanAudioVector[windowStartIndex : windowEndIndex] = shat
-        
-        # more debugging
-        if debug:
-            print("DEBUG OUTPUT: numerical ranks of H matrices")
-            print("")
-
-            print("i (window number):", str(i), "/", str(numWindows - 1))
-            print("windowAudioVector shape:", str(windowAudioVector.shape))
-            print("")
-            
-            r = np.linalg.matrix_rank(H)
-            print("Dimensions of H:", str(H.shape))
-            print("Rank of H: r =", str(r))
-            print("Calculated numerical rank of H: k =", str(k))
-
-            print("Dimensions of shat:", str(shat.shape))
-            print("")
-            print("")
-
-        
-        windowStartIndex = windowEndIndex
-        windowEndIndex += samplesPerWindow
 
     # even more debugging
     if debug:
