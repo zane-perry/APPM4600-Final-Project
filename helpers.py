@@ -226,6 +226,8 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
 
     cleanAudioPreVector = [[]] * avN
 
+    cleanAudioVector = None
+
     # window calculations for blockwise windows with no overlap between windows
     if windowMethod == "BLOCKWISE" and overlapDuration == 0:
         # - include extra windows by rounding up since there might not be an 
@@ -450,6 +452,9 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
         print("Number of samples per overlap:", str(samplesPerOverlap),\
               "samples")
         
+        # cleanAudioVector = np.zeros(totalSamples)
+        # cleanAudioVector = cleanAudioVector.reshape(totalSamples, 1)
+        
         # [samples] = [s] * ( [samples] / [s])
         samplesPerWindow = math.ceil(windowDuration * sampleRate)
         print("Number of samples per window:", str(samplesPerWindow), "samples")
@@ -600,16 +605,48 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
                 #     print(v, vi)
                 #     print(cleanAudioPreVector[v])
 
+            #cleanAudioVector[windowStartIndex : windowEndIndex] = shat
+            
             windowStartIndex += (samplesPerWindow - samplesPerOverlap)
             windowEndIndex = windowStartIndex + (samplesPerWindow)
             iv += 1
 
-        cleanAudioVector = np.zeros(avN)
+        cleanAudioVector = []
         for vii in range(0, len(cleanAudioPreVector)):
             if debug:
                 print("vii:", str(vii), "/", str(len(cleanAudioPreVector)), end = "\r")
-            avg = np.mean(np.array(cleanAudioPreVector[vii]), dtype=np.float64)
-            cleanAudioVector[vii] = avg
+            highAvg = np.mean(np.array([elem for elem in cleanAudioPreVector[vii] if elem > 0]), dtype=np.float64)
+            lowAvg = np.mean(np.array([elem for elem in cleanAudioPreVector[vii] if elem < 0]), dtype=np.float64)
+            if np.abs(highAvg) > np.abs(lowAvg):
+                cleanAudioVector.append(highAvg)
+            else:
+                cleanAudioVector.append(lowAvg)
+
+        cleanAudioVector = np.array(cleanAudioVector)
+        cleanAudioVector = cleanAudioVector.reshape(cleanAudioVector.shape[0], 1)
+        
+        if debug:
+            print("_______________________________________________________________")
+            print("")
+            print("DEBUG OUTPUT: cleanAudioVector")
+            print("")
+
+            print("Shape of cleanAudioVector")
+            #print(cleanAudioVector.shape)
+            print("")
+
+            samples = np.arange(0, totalSamples)
+            plt.figure()
+            plt.plot(samples, audioVector)
+            plt.legend(["Signal with white noise"])
+
+            plt.figure()
+            plt.plot(samples, cleanAudioVector)
+            plt.legend(["Processed signal"])
+
+            plt.show()
+
+        return cleanAudioVector
             
 
             # if i == numWindows - 1:

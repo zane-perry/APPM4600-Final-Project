@@ -35,12 +35,12 @@ testVector = testVector.reshape(testVector.shape[0], 1)
 
 cleanMaedataVector = removeWhiteNoiseSVD(whiteNoiseMaedataVector,\
                                          maedeeSampleRate, 0.04, "MLS", "AD",\
-                                            "SQRT(M)*ETA", 1, "BLOCKWISE",\
+                                            "SQRT(M)*ETA", 1.5, "BLOCKWISE",\
                                                 windowDuration=0.03,\
-                                                    overlapDuration=0.001,\
+                                                    overlapDuration=0.0005,\
                                                         debug=True)
 
 
 
 audioVectorToWavFile(cleanMaedataVector, maedeeSampleRate,\
-                     "gaussian_0.04_MLS_AD_sqrtMeta_2_Blockwise_0")
+                     "gaussian_0.04_MLS_AD_sqrtMeta_1.5_Blockwise_0.015")
