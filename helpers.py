@@ -514,7 +514,8 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
             hCol = windowAudioVector[0 : hm]
             hRow = windowAudioVector[hm - 1: winN + 1]
             H = sp.linalg.hankel(hCol, hRow)
-            svListH = np.linalg.svd(H, compute_uv=False)
+            HTH = np.transpose(H) @ H
+            svListH = np.linalg.svd(HTH, compute_uv=False)
 
             # - determine tolerance, the value that the singular values of H must be 
             #   greater than, based on tolMethod

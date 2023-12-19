@@ -35,7 +35,7 @@ testVector = testVector.reshape(testVector.shape[0], 1)
 
 cleanMaedataVector = removeWhiteNoiseSVD(whiteNoiseMaedataVector,\
                                          maedeeSampleRate, 0.04, "MLS", "AD",\
-                                            "SQRT(M)*ETA", 1, "BLOCKWISE",\
+                                            "META^2", 1, "BLOCKWISE",\
                                                 windowDuration=0.03,\
                                                     overlapDuration=0.01,\
                                                         debug=True)
