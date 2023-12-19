@@ -37,7 +37,7 @@ cleanMaedataVector = removeWhiteNoiseSVD(whiteNoiseMaedataVector,\
                                          maedeeSampleRate, 0.04, "MLS", "AD",\
                                             "SQRT(M)*ETA", 1, "BLOCKWISE",\
                                                 windowDuration=0.03,\
-                                                    overlapDuration=0.001,\
+                                                    overlapDuration=0.01,\
                                                         debug=True)
 
 

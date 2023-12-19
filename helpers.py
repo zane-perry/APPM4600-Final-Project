@@ -226,6 +226,9 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
 
     cleanAudioPreVector = [[]] * avN
 
+    cleanAudioVector = np.zeros(avN)
+    cleanAudioVector = cleanAudioVector.reshape(cleanAudioVector.shape[0], 1)
+
     # window calculations for blockwise windows with no overlap between windows
     if windowMethod == "BLOCKWISE" and overlapDuration == 0:
         # - include extra windows by rounding up since there might not be an 
@@ -594,28 +597,26 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
             if debug:
                 print("Dimensions of shat:", str(shat.shape))
 
-            for v, vi in zip(range(windowStartIndex, windowEndIndex), range(0, ms)):
-                cleanAudioPreVector[v].append(shat[vi][0])
+            #for v, vi in zip(range(windowStartIndex, windowEndIndex), range(0, ms)):
+                #leanAudioPreVector[v].append(shat[vi][0])
                 # if debug:
                 #     print(v, vi)
                 #     print(cleanAudioPreVector[v])
+
+            cleanAudioVector[windowStartIndex : windowEndIndex] = shat
 
             windowStartIndex += (samplesPerWindow - samplesPerOverlap)
             windowEndIndex = windowStartIndex + (samplesPerWindow)
             iv += 1
 
-        cleanAudioVector = np.zeros(avN)
-        for vii in range(0, len(cleanAudioPreVector)):
-            if debug:
-                print("vii:", str(vii), "/", str(len(cleanAudioPreVector)), end = "\r")
-            avg = np.mean(np.array(cleanAudioPreVector[vii]), dtype=np.float64)
-            cleanAudioVector[vii] = avg
+        # cleanAudioVector = np.zeros(avN)
+        # for vii in range(0, len(cleanAudioPreVector)):
+        #     if debug:
+        #         print("vii:", str(vii), "/", str(len(cleanAudioPreVector)), end = "\r")
+        #     avg = np.mean(np.array(cleanAudioPreVector[vii]), dtype=np.float64)
+        #     cleanAudioVector[vii] = avg
             
-
-            # if i == numWindows - 1:
-            #     cleanAudioVector[windowStartIndex :] = shat
-            # else:
-            #     cleanAudioVector[windowStartIndex : windowEndIndex] = shat
+        
             
     print("got here!")
     # even more debugging
@@ -637,6 +638,18 @@ def removeWhiteNoiseSVD(audioVector: np.array, sampleRate, eta,\
         plt.figure()
         plt.plot(samples, cleanAudioVector)
         plt.legend(["Processed signal"])
+
+        plt.figure()
+        plt.plot(samples, audioVector - cleanAudioVector)
+        plt.legend(["Residuals"])
+
+        rowCleanAudioVector = cleanAudioVector.reshape(cleanAudioVector.shape[0])
+        rowAudioVector = audioVector.reshape(audioVector.shape[0])
+        plt.figure()
+        plt.magnitude_spectrum(rowAudioVector, Fs=sampleRate, scale="linear")
+        plt.magnitude_spectrum(rowCleanAudioVector, Fs=sampleRate, scale="linear")
+        plt.legend(["Frequency spectrum of clean signal", "Frequency spectrum of clean signal"])
+
 
         plt.show()
 
